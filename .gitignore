@@ -1,5 +1,6 @@
 target/
 rust/target/
+/python/src/__pycache__
 .env
 
 # "Other Resources" repository

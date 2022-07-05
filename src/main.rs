@@ -18,6 +18,10 @@ use twitch_irc::{ClientConfig, SecureTCPTransport};
 use winapi;
 use windows_win;
 
+fn capitalize_string(s: &str) -> String {
+    return s[0..1].to_uppercase() + &s[1..];
+}
+
 fn move_direction(direction: &str, duration: f64) {
     let direction_char = direction.chars().next().expect("string is empty");
     let direction_key = Key::Layout(direction_char);
@@ -1418,7 +1422,10 @@ pub async fn twitch_loop(queue_sender: UnboundedSender<SystemInstruction>, bot_c
                                     InstructionPair {
                                         execution_order: 1,
                                         instruction: Instruction::ConsoleCommand {
-                                            command: format!("changefumo Momiji {}", size),
+                                            command: format!(
+                                                "changefumo SBFCam Momiji {}",
+                                                capitalize_string(&size) // console is case sensitive
+                                            ),
                                         },
                                     },
                                 ],
