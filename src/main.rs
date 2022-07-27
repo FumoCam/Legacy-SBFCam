@@ -205,12 +205,19 @@ fn run_console_command(command: &str) {
 async fn discord_log(
     message: &str,
     author: &str,
-    author_url: &str,
+    is_chat_log: bool,
 ) -> std::result::Result<(), Box<dyn std::error::Error + Sync + Send>> {
     const AUTHOR_AVATAR: &str = "https://brand.twitch.tv/assets/images/black.png";
-    let webhook_url =
-        env::var("DISCORD_LOG_WEBHOOK_URL").expect("$DISCORD_LOG_WEBHOOK_URL is not set");
-
+    let author_url = format!(
+        "https://www.twitch.tv/popout/sbfcam/viewercard/{}",
+        author.to_lowercase()
+    );
+    let env_key = if is_chat_log {
+        "DISCORD_CHAT_LOG_WEBHOOK_URL"
+    } else {
+        "DISCORD_LOG_WEBHOOK_URL"
+    };
+    let webhook_url = env::var(env_key).expect(&format!("{} is not set", env_key));
     let webhook_data = json!({
         "embeds": [
             {
@@ -234,8 +241,13 @@ async fn notify_admin(
         env::var("DISCORD_ALERT_WEBHOOK_URL").expect("$DISCORD_ALERT_WEBHOOK_URL is not set");
     let author_discord_id = env::var("AUTHOR_DISCORD_ID").expect("$AUTHOR_DISCORD_ID is not set");
     let mut webhook_data = HashMap::new();
-    webhook_data.insert("content", format!("<@{}>\n{}", author_discord_id, message));
-    webhook_data.insert("username", "SBF Cam".to_string());
+    webhook_data.insert(
+        "content",
+        format!(
+            "<@{}>\n{}\n<https://twitch.tv/sbfcam>",
+            author_discord_id, message
+        ),
+    );
     let client = reqwest::Client::new();
     let _resp = client.post(webhook_url).json(&webhook_data).send().await?;
     Ok(())
@@ -543,6 +555,7 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
     tp_locations.insert(String::from("fire"), String::from("Fireside Island"));
     tp_locations.insert(String::from("beach"), String::from("Beach"));
     tp_locations.insert(String::from("devil"), String::from("Scarlet Devil Mansion"));
+    tp_locations.insert(String::from("highway"), String::from("Highway"));
 
     let valid_tp_locations = tp_locations
         .keys()
@@ -610,6 +623,8 @@ pub async fn twitch_loop(queue_sender: UnboundedSender<SystemInstruction>, bot_c
                                     .unwrap();
                                 continue;
                             }
+                            let _discord_webook_result =
+                                discord_log(&message, &msg.sender.name, true).await;
 
                             if (message.starts_with("/") && !(message.starts_with("/e")))
                                 || message.starts_with("[")
@@ -698,7 +713,11 @@ pub async fn twitch_loop(queue_sender: UnboundedSender<SystemInstruction>, bot_c
                             }
                         }
                         "dev" => {
-                            let message = args.replacen("dev ", "", 1).replacen("dev", "", 1);
+                            let message = format!(
+                                "{}: {}",
+                                &msg.sender.name,
+                                args.replacen("dev ", "", 1).replacen("dev", "", 1),
+                            );
                             if message.len() == 0 {
                                 client
                                     .reply_to_privmsg(String::from("[Specify a message, this command is for emergencies! (Please do not misuse it)]"), &msg)
@@ -1439,11 +1458,7 @@ pub async fn twitch_loop(queue_sender: UnboundedSender<SystemInstruction>, bot_c
                     }
                 }
 
-                let author_url = format!(
-                    "https://www.twitch.tv/popout/sbfcam/viewercard/{}",
-                    msg.sender.name.to_lowercase()
-                );
-                let _result = discord_log(&msg.message_text, &msg.sender.name, &author_url).await;
+                let _result = discord_log(&msg.message_text, &msg.sender.name, false).await;
             }
             _ => {}
         }
