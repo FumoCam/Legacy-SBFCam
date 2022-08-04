@@ -16,5 +16,5 @@ if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]:
 # Start-Sleep -Seconds 5
 # [System.Threading.Thread]::Sleep(5000)
 
-cd ..
+cd ..\rust
 cargo run --release
