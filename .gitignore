@@ -1,7 +1,8 @@
+.env
 target/
 rust/target/
 /python/src/__pycache__
-.env
+/resources/selenium
 
 # "Other Resources" repository
 resources/archive_avatar_bg.png

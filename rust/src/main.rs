@@ -1,9 +1,12 @@
+use chrono::Timelike;
 use dotenv;
 use enigo::{Enigo, Key, KeyboardControllable, MouseButton, MouseControllable};
 use serde_json::json;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::env;
+use std::error::Error;
+use std::process::Command;
 use std::rc::Rc;
 use std::thread;
 use std::time::Duration;
@@ -252,6 +255,14 @@ async fn notify_admin(
     let _resp = client.post(webhook_url).json(&webhook_data).send().await?;
     Ok(())
 }
+
+fn join_server(game_id: i64, server_id: &str) {
+    match join_game_selenium(game_id.to_owned(), server_id) {
+        Err(_e) => eprintln!("Selenium Error\n{}", _e),
+        _ => (),
+    }
+}
+
 fn check_active(window_title: &str) -> bool {
     if get_active_window() != window_title {
         show_window_by_title(window_title);
@@ -260,6 +271,7 @@ fn check_active(window_title: &str) -> bool {
     }
     return true;
 }
+
 fn get_active_window() -> String {
     let active_window_hwnd = unsafe { winapi::um::winuser::GetForegroundWindow() };
     const BUFFER_SIZE: usize = 512;
@@ -314,6 +326,26 @@ fn show_window(raw_window_hwnd_ref: *mut winapi::shared::windef::HWND__) -> bool
         return minimize_success && maximize_success;
     }
 }
+fn trigger_restart() {
+    println!("Restart subprocess started");
+    let output = Command::new("cmd")
+        .args(["/C", "shutdown", "/f", "/r", "/t", "0"])
+        .output()
+        .expect("failed to execute restart");
+    println!("Restart subprocess finished");
+    println!("{}", String::from_utf8_lossy(&output.stdout));
+    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+}
+fn terminate_running_exe(exe_name: &str) {
+    println!("EXE termination subprocess started ({})", exe_name);
+    let output = Command::new("cmd")
+        .args(["/C", "taskkill", "/f", "/IM", &exe_name])
+        .output()
+        .expect("failed to execute Roblox termination");
+    println!("EXE termination subprocess finished ({})", exe_name);
+    println!("{}", String::from_utf8_lossy(&output.stdout));
+    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+}
 
 #[derive(Clone)]
 pub enum Instruction {
@@ -324,6 +356,9 @@ pub enum Instruction {
         command: String,
     },
     HideMouse {},
+    JoinServer {
+        server_id: String,
+    },
     Grief {},
     Leap {
         forward_amount: f64,
@@ -339,10 +374,12 @@ pub enum Instruction {
         direction: String, // TODO: Make char
         duration: f64,
     },
+    Restart {},
     Sit {},
     SystemChatMessage {
         message: String,
     },
+    TerminateGame {},
     UserChatMessage {
         author: String,
         message: String,
@@ -381,7 +418,7 @@ pub struct SystemInstruction {
 
 pub async fn queue_processor(
     mut channel_receiver: UnboundedReceiver<SystemInstruction>,
-    _bot_config: BotConfig,
+    bot_config: BotConfig,
 ) {
     let mut instruction_history: Vec<InstructionPair> = Vec::new();
 
@@ -486,6 +523,10 @@ pub async fn queue_processor(
                     }
                     move_direction(direction, *duration);
                 }
+                Instruction::Restart {} => {
+                    println!("restart");
+                    trigger_restart();
+                }
                 Instruction::Sit {} => {
                     println!("sit");
                     if client_origin {
@@ -499,6 +540,10 @@ pub async fn queue_processor(
                         instruction_history.push(history_entry);
                     }
                     send_system_chat(&message);
+                }
+                Instruction::TerminateGame {} => {
+                    println!("terminate_game");
+                    terminate_running_exe(&bot_config.game_executable);
                 }
                 Instruction::UserChatMessage { author, message } => {
                     println!("user_chat_message");
@@ -521,6 +566,16 @@ pub async fn queue_processor(
                     }
                     println!("zoom_camera");
                     camera_zoom(direction, *duration);
+                }
+                Instruction::JoinServer { server_id } => {
+                    // Deliberately synchronous/blocking
+                    println!("join_server {}", &server_id);
+                    join_server(bot_config.game_id.to_owned(), &server_id);
+                    let loaded_in = cv_check_loaded_in(&bot_config.game_name.to_owned());
+                    println!("Loaded in: {}", loaded_in);
+                    if !loaded_in {
+                        let _ = notify_admin("Failed to load in!").await;
+                    }
                 }
             }
 
@@ -578,7 +633,7 @@ pub async fn twitch_loop(queue_sender: UnboundedSender<SystemInstruction>, bot_c
     let client = &rc_client;
 
     //Begin Async Loop
-    match client.join(bot_config.twitch_channel_name) {
+    match client.join(bot_config.twitch_channel_name.to_owned()) {
         Ok(join) => join,
         Err(error) => panic!("Could not join the channel {:?}", error),
     }
@@ -1454,7 +1509,40 @@ pub async fn twitch_loop(queue_sender: UnboundedSender<SystemInstruction>, bot_c
                                 _ => (),
                             }
                         }
-                        _ => (),
+                        "rejoin" => {
+                            let mod_1 = env::var("TWITCH_MOD_1")
+                                .expect("$TWITCH_MOD_1 is not set")
+                                .to_lowercase();
+
+                            let author_name = msg.sender.name.to_string().to_lowercase();
+                            let message: &str;
+                            if author_name.to_lowercase() == mod_1.to_lowercase() {
+                                let result =
+                                    force_rejoin(queue_sender.clone(), bot_config.clone()).await;
+                                if result {
+                                    message = "[Rejoin queued successfully!]";
+                                } else {
+                                    message = "[Failed to queue rejoin, Roblox API may be down!]";
+                                }
+                            } else {
+                                message = "[You do not have permissions to run this!]";
+                            }
+                            client
+                                .reply_to_privmsg(message.to_string(), &msg)
+                                .await
+                                .unwrap();
+                        }
+                        _ => {
+                            client
+                                .reply_to_privmsg(
+                                    String::from(
+                                        "[Not a valid command! Type !help for a list of commands.]",
+                                    ),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                        }
                     }
                 }
 
@@ -1468,15 +1556,20 @@ pub async fn twitch_loop(queue_sender: UnboundedSender<SystemInstruction>, bot_c
 #[derive(Clone)]
 pub struct BotConfig {
     game_name: String,
+    game_executable: String,
+    game_id: i64,
     tp_locations: HashMap<String, String>,
     twitch_bot_username: String,
     twitch_bot_token: String,
+    player_token: String,
     twitch_channel_name: String,
     valid_tp_locations: String,
 }
 
 pub fn init_config() -> BotConfig {
     let game_name: String = "Roblox".to_string();
+    let game_executable: String = "RobloxPlayerBeta.exe".to_string();
+    let game_id: i64 = 7363647365;
     let twitch_channel_name: String = "sbfcam".to_string();
     let twitch_bot_username: String = "sbfcamBOT".to_string();
 
@@ -1484,12 +1577,16 @@ pub fn init_config() -> BotConfig {
 
     //Oauth (generated with https://twitchtokengenerator.com/):
     let twitch_bot_token = env::var("TWITCH_BOT_TOKEN").expect("$TWITCH_BOT_TOKEN is not set");
+    let player_token = env::var("PLAYER_TOKEN").expect("$PLAYER_TOKEN is not set");
 
     let bot_config = BotConfig {
         game_name,
+        game_executable,
+        game_id,
         tp_locations: tp_locations,
         twitch_bot_username,
         twitch_bot_token: twitch_bot_token,
+        player_token: player_token,
         twitch_channel_name,
         valid_tp_locations: valid_tp_locations,
     };
@@ -1568,10 +1665,658 @@ pub async fn anti_afk_loop(
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct GameInstance {
+    id: String,
+    players: Vec<String>,
+}
+const UNKNOWN_SERVER_ID: &str = "UNKNOWN";
+
+pub async fn get_instances(game_id: i64) -> Result<Option<Vec<GameInstance>>, Box<dyn Error>> {
+    let api_url: String = format!(
+        "https://games.roblox.com/v1/games/{game_id}/servers/Public",
+        game_id = game_id
+    );
+    let response = reqwest::get(api_url).await?;
+
+    if !(&response.status().is_success()) {
+        eprint!("Error\n{}", response.text().await?);
+        return Ok(Option::None);
+    }
+    let body = response.text().await?;
+    // println!("{}", body);
+
+    // TODO: This json line below can silently stop further code execution, if ": serde_json::Value" isnt used. Scary!
+    let body_json: serde_json::Value = serde_json::from_str(&body)?;
+
+    let debug_body = serde_json::to_string_pretty(&body_json).unwrap();
+    println!("Body:\n{}", debug_body);
+
+    if !(body_json.is_object()) {
+        eprint!("Error, body not an object\n{}", body);
+        return Ok(Option::None);
+    }
+    let body_obj = body_json.as_object().unwrap();
+    if !(body_obj.contains_key("data")) {
+        eprint!("Error, missing data\n{}", body);
+        return Ok(Option::None);
+    }
+    let response_data = body_obj.get("data").unwrap();
+    if !(response_data.is_array()) {
+        eprint!("Error, data not array\n{}", body);
+        return Ok(Option::None);
+    }
+    let data = response_data.as_array().unwrap();
+    let mut instance_list = Vec::new();
+    for instance in data {
+        let place = instance.as_object().unwrap();
+        let players_raw = place.get("playerTokens").unwrap().as_array().unwrap();
+        let mut players = Vec::new();
+        for player in players_raw {
+            players.push(player.as_str().unwrap().to_string());
+        }
+        let instance = GameInstance {
+            id: place.get("id").unwrap().as_str().unwrap().to_string(),
+            players: players,
+        };
+        instance_list.push(instance)
+    }
+
+    Ok(Some(instance_list))
+}
+
+async fn get_current_server(
+    player_token: String,
+    instance_list: Vec<GameInstance>,
+) -> GameInstance {
+    for instance in instance_list {
+        println!("{}", instance.id);
+        if instance.players.contains(&player_token) {
+            return instance;
+        }
+    }
+    return GameInstance {
+        id: UNKNOWN_SERVER_ID.to_string(),
+        players: vec![],
+    };
+}
+
+async fn check_in_server(player_token: String, instance_list: Vec<GameInstance>) -> bool {
+    let current_server = get_current_server(player_token, instance_list).await;
+    return current_server.id != UNKNOWN_SERVER_ID.to_string();
+}
+
+async fn get_best_server(instance_list: Vec<GameInstance>) -> GameInstance {
+    let mut best_server = GameInstance {
+        id: UNKNOWN_SERVER_ID.to_string(),
+        players: vec![],
+    };
+    for instance in instance_list {
+        if best_server.players.len() < instance.players.len() {
+            best_server = instance;
+        }
+    }
+    return best_server;
+}
+
+async fn check_in_best_server(player_token: String, instance_list: Vec<GameInstance>) -> bool {
+    const LOW_SWITCH: usize = 2;
+    const LOW_SWITCH_THRESH: usize = 7;
+    const HIGH_SWITCH: usize = 5;
+    let best_server = get_best_server(instance_list.clone()).await;
+    if best_server.id == UNKNOWN_SERVER_ID.to_string() {
+        // Somehow, our instance list is empty. Stay in current server for safety.
+        return true;
+    }
+
+    let mut current_server = GameInstance {
+        id: UNKNOWN_SERVER_ID.to_string(),
+        players: vec![],
+    };
+    for instance in instance_list {
+        println!("{}", instance.id);
+        if instance.players.contains(&player_token) {
+            current_server = instance.clone();
+            break;
+        }
+    }
+    if best_server.id == UNKNOWN_SERVER_ID.to_string() {
+        // Somehow, our instance list is empty. Stay in current server for safety.
+        return true;
+    }
+
+    // If the best server doesn't have more than LOW_SWITCH_THRESH,
+    // A server would need LOW_SWITCH more players to trigger a switch.
+    // Otherwise, a server would need HIGH_SWITCH more players to trigger a switch.
+
+    let required_difference = if best_server.players.len() <= LOW_SWITCH_THRESH {
+        LOW_SWITCH
+    } else {
+        HIGH_SWITCH
+    };
+    let difference = best_server.players.len() - current_server.players.len();
+    println!("[Server difference {}]", difference);
+    println!("[Required switch difference {}]", required_difference);
+    return difference <= required_difference;
+}
+
+async fn _force_rejoin(
+    queue_sender: UnboundedSender<SystemInstruction>,
+    bot_config: BotConfig,
+    instance_list: Vec<GameInstance>,
+) {
+    let best_server = get_best_server(instance_list.clone()).await;
+    let current_server =
+        get_current_server(bot_config.player_token.to_owned(), instance_list.clone()).await;
+
+    let mut instructions: Vec<InstructionPair> = vec![];
+    if current_server.id != UNKNOWN_SERVER_ID && check_active(&bot_config.game_name.to_owned()) {
+        instructions.push(InstructionPair {
+            execution_order: 0,
+            instruction: Instruction::SystemChatMessage {
+                message: "[Force-rejoin queued! Be right back!]".to_string(),
+            },
+        });
+        instructions.push(InstructionPair {
+            execution_order: 1,
+            instruction: Instruction::Wait { amount_ms: 7000 },
+        });
+    }
+    instructions.push(InstructionPair {
+        execution_order: 2,
+        instruction: Instruction::TerminateGame {},
+    });
+    instructions.push(InstructionPair {
+        execution_order: 3,
+        instruction: Instruction::Wait { amount_ms: 10000 },
+    });
+    instructions.push(InstructionPair {
+        execution_order: 4,
+        instruction: Instruction::JoinServer {
+            server_id: best_server.id.to_owned(),
+        },
+    });
+    instructions.push(InstructionPair {
+        execution_order: 5,
+        instruction: Instruction::CheckActive {
+            window_title: bot_config.game_name.to_owned(),
+        },
+    });
+    instructions.push(InstructionPair {
+        execution_order: 6,
+        instruction: Instruction::SystemChatMessage {
+            message: "[Crash recovery complete! Ready to accept commands.]".to_string(),
+        },
+    });
+
+    let join_instruction = SystemInstruction {
+        client: None,
+        chat_message: None,
+        instructions: instructions,
+    };
+    match queue_sender.send(join_instruction) {
+        Err(_e) => eprintln!("JoinServer Channel Error"),
+        _ => (),
+    }
+}
+
+async fn force_rejoin(
+    queue_sender: UnboundedSender<SystemInstruction>,
+    bot_config: BotConfig,
+) -> bool {
+    let get_instances_result = get_instances(bot_config.game_id).await;
+    match get_instances_result {
+        Ok(instance_list_option) => match instance_list_option {
+            Some(instance_list) => {
+                let best_server = get_best_server(instance_list.clone()).await;
+                if best_server.id == UNKNOWN_SERVER_ID.to_string() {
+                    eprintln!("[Roblox API check failed]");
+                    return false;
+                } else {
+                    _force_rejoin(
+                        queue_sender.clone(),
+                        bot_config.clone(),
+                        instance_list.clone(),
+                    )
+                    .await;
+                    return true;
+                }
+            }
+            None => {
+                eprintln!("[Roblox API check failed]");
+                return false;
+            }
+        },
+        Err(_error) => {
+            eprintln!("[Roblox API check failed]");
+            return false;
+        }
+    }
+}
+
+async fn server_check_logic(
+    queue_sender: UnboundedSender<SystemInstruction>,
+    bot_config: BotConfig,
+    instance_list: Vec<GameInstance>,
+) {
+    let in_server =
+        check_in_server(bot_config.player_token.to_owned(), instance_list.clone()).await;
+    let in_best_server = if in_server {
+        check_in_best_server(bot_config.player_token.to_owned(), instance_list.clone()).await
+    } else {
+        false
+    };
+
+    if in_server && in_best_server {
+        return;
+    }
+
+    let best_server = get_best_server(instance_list.clone()).await;
+    let current_server =
+        get_current_server(bot_config.player_token.to_owned(), instance_list.clone()).await;
+    let difference = best_server.players.len() - current_server.players.len();
+
+    let mut instructions = vec![
+        InstructionPair {
+            execution_order: 0,
+            instruction: Instruction::CheckActive {
+                window_title: bot_config.game_name.to_owned(),
+            },
+        },
+        InstructionPair {
+            execution_order: 1,
+            instruction: Instruction::SystemChatMessage {
+                message: format!(
+                    "[Moving servers! There is a server with {} more players. See you there!]",
+                    difference
+                ),
+            },
+        },
+        InstructionPair {
+            execution_order: 2,
+            instruction: Instruction::Wait { amount_ms: 7000 },
+        },
+        InstructionPair {
+            execution_order: 3,
+            instruction: Instruction::TerminateGame {},
+        },
+        InstructionPair {
+            execution_order: 4,
+            instruction: Instruction::Wait { amount_ms: 10000 },
+        },
+        InstructionPair {
+            execution_order: 5,
+            instruction: Instruction::JoinServer {
+                server_id: best_server.id.to_owned(),
+            },
+        },
+        InstructionPair {
+            execution_order: 6,
+            instruction: Instruction::CheckActive {
+                window_title: bot_config.game_name.to_owned(),
+            },
+        },
+        InstructionPair {
+            execution_order: 7,
+            instruction: Instruction::SystemChatMessage {
+                message: "[Server relocation complete! Ready to accept commands.]".to_string(),
+            },
+        },
+    ];
+    if !(in_server) {
+        // Crash likely
+        println!("Potential crash detected");
+
+        let is_active = check_active(&bot_config.game_name.to_owned());
+        let exe_status = if is_active { "Running" } else { "Not found" };
+        let message = format!("Likely crash detected | {}", exe_status);
+        _ = notify_admin(&message).await;
+
+        instructions = vec![
+            InstructionPair {
+                execution_order: 0,
+                instruction: Instruction::TerminateGame {},
+            },
+            InstructionPair {
+                execution_order: 1,
+                instruction: Instruction::Wait { amount_ms: 10000 },
+            },
+            InstructionPair {
+                execution_order: 2,
+                instruction: Instruction::JoinServer {
+                    server_id: best_server.id.to_owned(),
+                },
+            },
+            InstructionPair {
+                execution_order: 3,
+                instruction: Instruction::CheckActive {
+                    window_title: bot_config.game_name.to_owned(),
+                },
+            },
+            InstructionPair {
+                execution_order: 4,
+                instruction: Instruction::SystemChatMessage {
+                    message: "[Crash recovery complete! Ready to accept commands.]".to_string(),
+                },
+            },
+        ];
+    }
+
+    let join_instruction = SystemInstruction {
+        client: None,
+        chat_message: None,
+        instructions: instructions,
+    };
+    match queue_sender.send(join_instruction) {
+        Err(_e) => eprintln!("JoinServer Channel Error"),
+        _ => (),
+    }
+}
+
+async fn server_check_loop(
+    queue_sender: UnboundedSender<SystemInstruction>,
+    bot_config: BotConfig,
+) {
+    let interval_minutes = 3;
+    let mut interval = tokio::time::interval(Duration::from_millis(interval_minutes * 60 * 1000));
+    loop {
+        interval.tick().await;
+        let get_instances_result = get_instances(bot_config.game_id).await;
+        match get_instances_result {
+            Ok(instance_list_option) => match instance_list_option {
+                Some(instance_list) => {
+                    let best_server = get_best_server(instance_list.clone()).await;
+                    if best_server.id == UNKNOWN_SERVER_ID.to_string() {
+                        eprint!("[Roblox API check failed]")
+                    } else {
+                        server_check_logic(
+                            queue_sender.clone(),
+                            bot_config.clone(),
+                            instance_list.clone(),
+                        )
+                        .await;
+                    }
+                }
+                None => {
+                    eprintln!("[Roblox API check failed]");
+                }
+            },
+            Err(_error) => {
+                eprintln!("[Roblox API check failed]");
+            }
+        }
+    }
+}
+
+fn join_game_selenium(
+    game_id: i64,
+    instance_id: &str,
+) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    println!("Selenium subprocess started");
+    let driver = match env::var("CHROME_DRIVER_FILE_NAME") {
+        Ok(val) => val,
+        Err(_e) => "chromedriver.exe".to_string(),
+    };
+    let output = Command::new("cmd")
+        .args([
+            "/C",
+            "poetry",
+            "run",
+            "python",
+            "join_game.py",
+            "--game",
+            &game_id.to_string(),
+            "--instance",
+            &instance_id,
+            "--driver",
+            &driver,
+        ])
+        .current_dir("../python")
+        .output()
+        .expect("failed to execute process");
+    println!("Selenium subprocess finished");
+    println!("{}", String::from_utf8_lossy(&output.stdout));
+    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+
+    Ok(())
+}
+
+pub async fn restart_warn(restart_warn_ticker: i32) -> i32 {
+    let now = chrono::offset::Local::now();
+    if now.hour() != 3 {
+        return -1;
+    }
+    const FIVE_MINUTE_WARNING: i32 = 55;
+    const ONE_MINUTE_WARNING: i32 = 58;
+    const REBOOT_TIME: i32 = 59;
+    let minute = now.minute() as i32;
+
+    if restart_warn_ticker == minute || minute < FIVE_MINUTE_WARNING - 1 {
+        return -1;
+    }
+
+    // Don't do anything if our uptime is less than two minutes
+    unsafe {
+        const TWO_MINUTES: u64 = 120000; // 1000 * 60 * 2, Could be one minute, but safety padding is nice
+        if winapi::um::sysinfoapi::GetTickCount64() < TWO_MINUTES {
+            return -1;
+        }
+    }
+
+    if minute == FIVE_MINUTE_WARNING {
+        return FIVE_MINUTE_WARNING;
+    } else if minute == ONE_MINUTE_WARNING {
+        return ONE_MINUTE_WARNING;
+    } else if minute == REBOOT_TIME {
+        return REBOOT_TIME;
+    } else {
+        return -1;
+    };
+}
+
+pub async fn restart_logic(
+    queue_sender: UnboundedSender<SystemInstruction>,
+    bot_config: BotConfig,
+    restart_return: i32,
+) {
+    let message = match restart_return {
+        55 => "[Restarting in 5 minutes!]",
+        58 => "[Restarting in 1 minute!]",
+        59 => "[Restarting!]",
+        _ => "[Restarting soon!]", // ???
+    };
+    let mut instructions = vec![
+        InstructionPair {
+            execution_order: 0,
+            instruction: Instruction::CheckActive {
+                window_title: bot_config.game_name.to_owned(),
+            },
+        },
+        InstructionPair {
+            execution_order: 1,
+            instruction: Instruction::SystemChatMessage {
+                message: message.to_string(),
+            },
+        },
+    ];
+    if restart_return == 59 {
+        // Add restart to the instructions
+        instructions.push(InstructionPair {
+            execution_order: 2,
+            instruction: Instruction::Wait { amount_ms: 1000 },
+        });
+        instructions.push(InstructionPair {
+            execution_order: 3,
+            instruction: Instruction::Restart {},
+        });
+    }
+    let restart_system_instruction = SystemInstruction {
+        client: None,
+        chat_message: None,
+        instructions: instructions,
+    };
+    match queue_sender.send(restart_system_instruction) {
+        Err(_e) => eprintln!("Restart chat command error"),
+        _ => (),
+    }
+}
+
+pub async fn clock_tick_loop(
+    queue_sender: UnboundedSender<SystemInstruction>,
+    bot_config: BotConfig,
+) {
+    let mut interval = tokio::time::interval(Duration::from_millis(1000));
+    let mut restart_warn_ticker = -1; // TODO: This needs a way cleaner system
+    loop {
+        interval.tick().await;
+        let restart_return = restart_warn(restart_warn_ticker).await;
+        if restart_warn_ticker != restart_return && restart_return != -1 {
+            restart_warn_ticker = restart_return;
+            restart_logic(queue_sender.clone(), bot_config.clone(), restart_return).await;
+        }
+    }
+}
+
+fn get_pixel(
+    left: i32,
+    top: i32,
+    width: i32,
+    height: i32,
+    red: i32,
+    green: i32,
+    blue: i32,
+) -> bool {
+    println!("Get Pixel subprocess started");
+    let detect_value = format!("{},{},{}", &red, &green, &blue);
+    let output = Command::new("cmd")
+        .args([
+            "/C",
+            "poetry",
+            "run",
+            "python",
+            "cv_functions.py",
+            "--func",
+            "detect_pixels",
+            "--left",
+            &left.to_string(),
+            "--top",
+            &top.to_string(),
+            "--width",
+            &width.to_string(),
+            "--height",
+            &height.to_string(),
+            "--detect_value",
+            &detect_value,
+        ])
+        .current_dir("../python")
+        .output()
+        .expect("failed to execute process");
+    println!("Get Pixel subprocess finished");
+    println!("{}", String::from_utf8_lossy(&output.stdout));
+    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+    match serde_json::from_str::<bool>(&String::from_utf8_lossy(&output.stdout)) {
+        Ok(return_val) => {
+            println!("Pixel Response: {}", return_val);
+            return return_val;
+        }
+        Err(e) => {
+            eprintln!("Error! {:#?}", e);
+            return false;
+        }
+    }
+}
+
+fn cv_get_backpack_hover(window_title: &str) -> bool {
+    check_active(window_title);
+    const DELAY: Duration = Duration::from_millis(500);
+    let mut enigo = Enigo::new();
+    mouse_move(&mut enigo, 0.47, 0.95);
+    thread::sleep(DELAY);
+    mouse_move(&mut enigo, 0.47, 0.95);
+    return get_pixel(690, 669, 10, 5, 173, 173, 173);
+}
+fn cv_get_navbar(window_title: &str) -> bool {
+    check_active(window_title);
+    const DELAY: Duration = Duration::from_millis(500);
+    let mut enigo = Enigo::new();
+    mouse_move(&mut enigo, 0.47, 0.99);
+    thread::sleep(DELAY);
+    mouse_move(&mut enigo, 0.47, 0.99);
+    return get_pixel(690, 669, 10, 5, 246, 246, 246);
+}
+fn cv_get_navbar_hidden(window_title: &str) -> bool {
+    check_active(&window_title);
+    const DELAY: Duration = Duration::from_millis(500);
+    let mut enigo = Enigo::new();
+    mouse_hide(&mut enigo);
+    thread::sleep(DELAY);
+    mouse_hide(&mut enigo);
+    return !(get_pixel(690, 669, 10, 5, 246, 246, 246));
+}
+
+fn cv_check_loaded_in(window_title: &str) -> bool {
+    let max_seconds = 120;
+    let delay_seconds = 2;
+    let attempts = max_seconds / delay_seconds;
+    let delay: Duration = Duration::from_millis((delay_seconds * 1000) as u64);
+
+    let mut program_load_success = false;
+    for _attempt in 0..attempts {
+        if check_active(window_title) {
+            program_load_success = true;
+            break;
+        }
+        thread::sleep(delay);
+    }
+    if !program_load_success {
+        return false;
+    }
+
+    let mut backpack_hover_success = false;
+    for _attempt in 0..attempts {
+        if cv_get_backpack_hover(window_title) {
+            backpack_hover_success = true;
+            break;
+        }
+        thread::sleep(delay);
+    }
+    if !backpack_hover_success {
+        return false;
+    }
+
+    let mut get_navbar_success = false;
+    for _attempt in 0..attempts {
+        if cv_get_navbar(window_title) {
+            get_navbar_success = true;
+            break;
+        }
+        thread::sleep(delay);
+    }
+    if !get_navbar_success {
+        return false;
+    }
+
+    let mut get_navbar_hidden_success = false;
+    for _attempt in 0..attempts {
+        if cv_get_navbar_hidden(window_title) {
+            get_navbar_hidden_success = true;
+            break;
+        }
+        thread::sleep(delay);
+    }
+    if !get_navbar_hidden_success {
+        return false;
+    }
+
+    return true;
+}
+
 #[tokio::main]
 pub async fn main() {
-    dotenv::dotenv().ok();
+    dotenv::from_filename("..\\.env").ok();
+
     let bot_config = init_config();
+
     let (queue_sender, queue_receiver): (
         UnboundedSender<SystemInstruction>,
         UnboundedReceiver<SystemInstruction>,
@@ -1580,6 +2325,14 @@ pub async fn main() {
     let twitch_task = twitch_loop(queue_sender.clone(), bot_config.clone());
     let anti_afk_task = anti_afk_loop(queue_sender.clone(), bot_config.clone());
     let queue_processor_task = queue_processor(queue_receiver, bot_config.clone());
+    let server_check_task = server_check_loop(queue_sender.clone(), bot_config.clone());
+    let clock_tick_task = clock_tick_loop(queue_sender.clone(), bot_config.clone());
 
-    let (_r1, _r2, _r3) = tokio::join!(twitch_task, anti_afk_task, queue_processor_task);
+    let (_r1, _r2, _r3, _r4, _r5) = tokio::join!(
+        twitch_task,
+        anti_afk_task,
+        queue_processor_task,
+        server_check_task,
+        clock_tick_task,
+    );
 }
