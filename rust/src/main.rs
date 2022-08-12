@@ -621,7 +621,11 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
     return (tp_locations, valid_tp_locations);
 }
 
-pub async fn twitch_loop(queue_sender: UnboundedSender<SystemInstruction>, bot_config: BotConfig) {
+pub async fn twitch_loop(
+    queue_sender: UnboundedSender<SystemInstruction>,
+    hud_sender: UnboundedSender<HUDInstruction>,
+    bot_config: BotConfig,
+) {
     let twitch_config = ClientConfig::new_simple(StaticLoginCredentials::new(
         bot_config.twitch_bot_username.to_owned(),
         Some(bot_config.twitch_bot_token.to_owned()),
@@ -649,10 +653,18 @@ pub async fn twitch_loop(queue_sender: UnboundedSender<SystemInstruction>, bot_c
                     }
                     let trigger = clean_args[0].to_lowercase();
                     match trigger.as_ref() {
-                        "ping" => client
-                            .reply_to_privmsg(String::from("pong"), &msg)
-                            .await
-                            .unwrap(),
+                        "ping" => {
+                            match hud_sender.send(HUDInstruction::GenericMessage {
+                                message: "ping".to_string(),
+                            }) {
+                                Err(_e) => eprintln!("HUD Channel Error"),
+                                _ => (),
+                            }
+                            client
+                                .reply_to_privmsg(String::from("pong"), &msg)
+                                .await
+                                .unwrap();
+                        }
                         "help" => {
                             client
                                 .reply_to_privmsg(
@@ -2311,28 +2323,140 @@ fn cv_check_loaded_in(window_title: &str) -> bool {
     return true;
 }
 
+// START HUD STUFF
+#[derive(Clone)]
+pub enum HUDInstruction {
+    AddClient {
+        client_id: u64,
+        responder: simple_websockets::Responder,
+    },
+    RemoveClient {
+        client_id: u64,
+    },
+    ClientMessage {
+        message: String,
+    },
+    ClientBinaryMessage {
+        binary_message: Vec<u8>,
+    },
+    GenericMessage {
+        message: String,
+    },
+}
+pub async fn hud_loop(mut hud_receiver: UnboundedReceiver<HUDInstruction>) {
+    let mut clients: HashMap<u64, simple_websockets::Responder> = HashMap::new();
+    loop {
+        let hud_instruction = hud_receiver.recv().await.unwrap();
+
+        match hud_instruction {
+            HUDInstruction::AddClient {
+                client_id,
+                responder,
+            } => {
+                clients.insert(client_id, responder);
+            }
+            HUDInstruction::RemoveClient { client_id } => {
+                clients.remove(&client_id);
+            }
+            HUDInstruction::ClientMessage { message } => {
+                println!("[HUD] ClientMessage: {}", message);
+            }
+            HUDInstruction::ClientBinaryMessage { binary_message } => {
+                println!("[HUD] ClientBinaryMessage: {:?}", binary_message);
+            }
+            HUDInstruction::GenericMessage { message } => {
+                println!(
+                    "[HUD] Sending message to all connected clients ({}): {}",
+                    clients.len(),
+                    message
+                );
+                for (_client_id, client_responder) in &clients {
+                    client_responder.send(simple_websockets::Message::Text(message.to_owned()));
+                }
+            }
+        }
+    }
+}
+pub async fn hud_ws_server(hud_sender: UnboundedSender<HUDInstruction>) {
+    let event_hub = simple_websockets::launch(8080).expect("[HUD] failed to listen on port 8080");
+    loop {
+        match event_hub.poll_async().await {
+            simple_websockets::Event::Connect(client_id, responder) => {
+                println!("[HUD] A client connected with id #{}", client_id);
+                match hud_sender.send(HUDInstruction::AddClient {
+                    client_id: client_id,
+                    responder: responder,
+                }) {
+                    Err(_e) => eprintln!("[HUD] Client Connect Channel Error"),
+                    _ => (),
+                }
+            }
+            simple_websockets::Event::Disconnect(client_id) => {
+                println!("[HUD] A client connected with id #{}", client_id);
+                match hud_sender.send(HUDInstruction::RemoveClient {
+                    client_id: client_id,
+                }) {
+                    Err(_e) => eprintln!("[HUD] Client Disconnect Channel Error"),
+                    _ => (),
+                }
+            }
+            simple_websockets::Event::Message(client_id, message) => {
+                println!(
+                    "[HUD] Received a message from client #{}: {:?}",
+                    client_id, message
+                );
+                let hud_message_instruction = match message {
+                    simple_websockets::Message::Text(text) => {
+                        HUDInstruction::ClientMessage { message: text }
+                    }
+                    simple_websockets::Message::Binary(bytes) => {
+                        HUDInstruction::ClientBinaryMessage {
+                            binary_message: bytes,
+                        }
+                    }
+                };
+                match hud_sender.send(hud_message_instruction) {
+                    Err(_e) => eprintln!("[HUD] Client Message Channel Error"),
+                    _ => (),
+                }
+            }
+        }
+    }
+}
+// END HUD STUFF
+
 #[tokio::main]
 pub async fn main() {
     dotenv::from_filename("..\\.env").ok();
 
     let bot_config = init_config();
 
+    let (hud_sender, hud_receiver): (
+        UnboundedSender<HUDInstruction>,
+        UnboundedReceiver<HUDInstruction>,
+    ) = unbounded_channel();
     let (queue_sender, queue_receiver): (
         UnboundedSender<SystemInstruction>,
         UnboundedReceiver<SystemInstruction>,
     ) = unbounded_channel();
 
-    let twitch_task = twitch_loop(queue_sender.clone(), bot_config.clone());
+    let twitch_task = twitch_loop(queue_sender.clone(), hud_sender.clone(), bot_config.clone());
     let anti_afk_task = anti_afk_loop(queue_sender.clone(), bot_config.clone());
     let queue_processor_task = queue_processor(queue_receiver, bot_config.clone());
     let server_check_task = server_check_loop(queue_sender.clone(), bot_config.clone());
     let clock_tick_task = clock_tick_loop(queue_sender.clone(), bot_config.clone());
+    let hud_loop_task = hud_loop(hud_receiver);
+    let hud_ws_server_task = hud_ws_server(hud_sender.clone());
 
-    let (_r1, _r2, _r3, _r4, _r5) = tokio::join!(
+    check_active(&bot_config.game_name.to_owned());
+
+    let (_r1, _r2, _r3, _r4, _r5, _r6, _r7) = tokio::join!(
         twitch_task,
         anti_afk_task,
         queue_processor_task,
         server_check_task,
         clock_tick_task,
+        hud_loop_task,
+        hud_ws_server_task
     );
 }
