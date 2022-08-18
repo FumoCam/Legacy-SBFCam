@@ -104,13 +104,76 @@ body {
   font-family: ArameMonoThin;
   position: absolute;
   font-size: 40px;
-  bottom: 0px;
-  right: 0px;
+  top: 50%;
   color: rgba(255, 200, 50, 0.9);
   text-shadow: -4px 4px 5px rgba(255, 200, 0, 0.7);
   font-weight: 600;
   text-align: left;
   z-index: 100;
+}
+#help-container {
+  position: absolute;
+  font-size: 16px;
+  bottom: 5px;
+  left: 5px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 5px;
+  border-radius: 4px;
+  z-index: 0;
+  text-align: left;
+}
+#help-label {
+  font-family: "Red Hat Text", sans-serif;
+  font-weight: 400;
+  color: rgba(150, 150, 150, 1);
+}
+#help-value {
+  font-family: "Red Hat Text", monospace;
+  font-weight: 600;
+  font-size: 18px;
+  font-stretch: ultra-expanded;
+  background: rgba(50, 50, 50, 0.7);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-left: 3px;
+}
+
+#update-container {
+  position: absolute;
+  font-size: 14px;
+  bottom: 5px;
+  left: 5px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 5px;
+  border-radius: 4px;
+  z-index: 0;
+  font-family: "Red Hat Text", sans-serif;
+  font-weight: 200;
+  text-align: left;
+  color: rgba(255, 255, 255, 1);
+}
+#update-title-container {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+}
+#update-label {
+  color: rgba(150, 150, 150, 1);
+}
+#update-list-container {
+  overflow-y: hidden;
+  margin-top: 5px;
+  max-height: 25px;
+  max-width: 250px;
+  min-width: 170px;
+}
+
+#update-list {
+  padding-left: 10px;
+  margin: 0;
+}
+#update-list > li:not(:first-child) {
+  padding-top: 10px;
 }
 
 #bottom-right-container {

@@ -306,20 +306,81 @@ function clock() {
     document.getElementById("date-value").innerText = day;
   }, 1000);
 }
-function set_version() {
-  const VERSION = 16;
 
+function update_loop(animation_speed_ms) {
+  const fade_in_time = 300;
+  const couple_loops_time = animation_speed_ms * 3 - fade_in_time;
+  const hidden_time = animation_speed_ms * 5; // 12 = A 15-second changelog stays hidden for 3 minutes
+  const update_container = document.getElementById("update-container");
+  const help_container = document.getElementById("help-container");
+  function core() {
+    setTimeout(function () {
+      console.log("[CHANGELOG] Done grow, removing");
+      update_container.classList.remove("anim-grow");
+      setTimeout(function () {
+        console.log("[CHANGELOG] Started shrink");
+        update_container.classList.add("anim-shrink");
+        help_container.classList.remove("anim-shrink");
+        help_container.classList.add("anim-grow");
+        setTimeout(function () {
+          console.log("[CHANGELOG] Removing shrink, adding grow");
+          help_container.classList.remove("anim-grow");
+          help_container.classList.add("anim-shrink");
+          update_container.classList.remove("anim-shrink");
+          update_container.classList.add("anim-grow");
+        }, hidden_time);
+      }, couple_loops_time);
+    }, fade_in_time);
+  }
+  core();
+  setInterval(function () {
+    console.log(
+      "[CHANGELOG] Loop complete, changelog visible, queueing shrink for later"
+    );
+    core();
+  }, fade_in_time + couple_loops_time + hidden_time);
+}
+
+function changelog() {
+  // START CHANGE-ME
+  const VERSION = 16;
+  const UPDATE_DATE = "2022-08-18";
+  const UPDATE_ITEMS = [
+    "Added epoch day, time, and version to HUD",
+    "Added temp/load monitoring to HUD",
+    "Added changelog to HUD",
+  ];
+  // END CHANGE-ME
   animateNumericalValue(
     document.getElementById("version-value"),
     0,
     VERSION,
-    1000
+    750
   );
+  document.getElementById("update-date").innerText = UPDATE_DATE;
+  const update_list_container = document.getElementById(
+    "update-list-container"
+  );
+  const update_ul = document.getElementById("update-list");
+  UPDATE_ITEMS.forEach(function (value) {
+    let update_li = document.createElement("li");
+    update_li.className = "update-item";
+    update_li.innerHTML = value;
+    update_ul.appendChild(update_li);
+  });
+  const ul_height = update_ul.clientHeight;
+  const animation_speed_ms = Math.round(1.1 * (ul_height / 10) * 1000);
+  if (update_list_container.clientHeight < ul_height) {
+    update_ul.classList.add("anim-list-scroll");
+    //Roughly good speed, tested on 2 rows vs 10 rows
+    update_ul.style.animationDuration = `${animation_speed_ms}ms`;
+  }
+  update_loop(animation_speed_ms);
 }
 
 function main() {
   clock();
   connect();
-  set_version();
+  changelog();
 }
 main();
