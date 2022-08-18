@@ -387,6 +387,10 @@ pub enum Instruction {
     Wait {
         amount_ms: u64,
     },
+    WaitWithMessage {
+        amount_ms: u64,
+        message: String,
+    },
     ZoomCamera {
         direction: String, // TODO: Make char
         duration: f64,
@@ -418,6 +422,7 @@ pub struct SystemInstruction {
 
 pub async fn queue_processor(
     mut channel_receiver: UnboundedReceiver<SystemInstruction>,
+    hud_sender: UnboundedSender<HUDInstruction>,
     bot_config: BotConfig,
 ) {
     let mut instruction_history: Vec<InstructionPair> = Vec::new();
@@ -557,6 +562,19 @@ pub async fn queue_processor(
                     let duration = tokio::time::Duration::from_millis(*amount_ms);
                     tokio::time::sleep(duration).await;
                 }
+                Instruction::WaitWithMessage { amount_ms, message } => {
+                    println!("wait_with_message {} {}", amount_ms, message);
+
+                    match hud_sender.send(HUDInstruction::TimedMessage {
+                        message: message.to_string(),
+                        time: amount_ms.to_owned(),
+                    }) {
+                        Err(_e) => eprintln!("HUD Channel Error"),
+                        _ => (),
+                    }
+                    let duration = tokio::time::Duration::from_millis(*amount_ms);
+                    tokio::time::sleep(duration).await;
+                }
                 Instruction::ZoomCamera {
                     direction,
                     duration,
@@ -611,6 +629,7 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
     tp_locations.insert(String::from("beach"), String::from("Beach"));
     tp_locations.insert(String::from("devil"), String::from("Scarlet Devil Mansion"));
     tp_locations.insert(String::from("highway"), String::from("Highway"));
+    tp_locations.insert(String::from("rat"), String::from("Rat Sewers"));
 
     let valid_tp_locations = tp_locations
         .keys()
@@ -1840,7 +1859,10 @@ async fn _force_rejoin(
     });
     instructions.push(InstructionPair {
         execution_order: 3,
-        instruction: Instruction::Wait { amount_ms: 10000 },
+        instruction: Instruction::WaitWithMessage {
+            amount_ms: 10000,
+            message: String::from("ABIDING ROBLOX RATE-LIMIT"),
+        },
     });
     instructions.push(InstructionPair {
         execution_order: 4,
@@ -1954,7 +1976,10 @@ async fn server_check_logic(
         },
         InstructionPair {
             execution_order: 4,
-            instruction: Instruction::Wait { amount_ms: 10000 },
+            instruction: Instruction::WaitWithMessage {
+                amount_ms: 10000,
+                message: String::from("ABIDING ROBLOX RATE-LIMIT"),
+            },
         },
         InstructionPair {
             execution_order: 5,
@@ -1991,7 +2016,10 @@ async fn server_check_logic(
             },
             InstructionPair {
                 execution_order: 1,
-                instruction: Instruction::Wait { amount_ms: 10000 },
+                instruction: Instruction::WaitWithMessage {
+                    amount_ms: 10000,
+                    message: String::from("ABIDING ROBLOX RATE-LIMIT"),
+                },
             },
             InstructionPair {
                 execution_order: 2,
@@ -2173,18 +2201,170 @@ pub async fn restart_logic(
     }
 }
 
+// Start Temperature/OpenHardwareMonitor Code
+#[allow(non_snake_case)]
+#[derive(serde::Serialize, serde::Deserialize)]
+struct OpenHardwareMonitorSensorValue {
+    id: i32,
+    Text: String,
+    // Children: Vec<serde_json::Value>,
+    Min: String,
+    Value: String,
+    Max: String,
+    ImageURL: String,
+}
+#[allow(non_snake_case)]
+#[derive(serde::Serialize, serde::Deserialize)]
+struct OpenHardwareMonitorSensorType {
+    id: i32,
+    Text: String,
+    Children: Vec<OpenHardwareMonitorSensorValue>,
+    Min: String,
+    Value: String,
+    Max: String,
+    ImageURL: String,
+}
+#[allow(non_snake_case)]
+#[derive(serde::Serialize, serde::Deserialize)]
+struct OpenHardwareMonitorHardware {
+    id: i32,
+    Text: String,
+    Children: Vec<OpenHardwareMonitorSensorType>,
+    Min: String,
+    Value: String,
+    Max: String,
+    ImageURL: String,
+}
+#[allow(non_snake_case)]
+#[derive(serde::Serialize, serde::Deserialize)]
+struct OpenHardwareMonitorComputer {
+    id: i32,
+    Text: String,
+    Children: Vec<OpenHardwareMonitorHardware>,
+    Min: String,
+    Value: String,
+    Max: String,
+    ImageURL: String,
+}
+#[allow(non_snake_case)]
+#[derive(serde::Serialize, serde::Deserialize)]
+struct OpenHardwareMonitorBase {
+    id: i32,
+    Text: String,
+    Children: Vec<OpenHardwareMonitorComputer>,
+    Min: String,
+    Value: String,
+    Max: String,
+    ImageURL: String,
+}
+
+pub async fn get_hardware_data() -> Result<Option<String>, Box<dyn Error>> {
+    // Assumes a running OpenHardwareMonitor reporting server. Ring0 in rust is not worth it.
+    // https://openhardwaremonitor.org/downloads/
+    let api_url: String = String::from("http://localhost:8085/data.json");
+    let response = reqwest::get(api_url).await?;
+
+    if !(&response.status().is_success()) {
+        eprint!("Error\n{}", response.text().await?);
+        return Ok(Option::None);
+    }
+    let body = response.text().await?;
+
+    match serde_json::from_str::<OpenHardwareMonitorBase>(&body) {
+        Ok(report_data) => {
+            let mut cpu_temp = "";
+            let mut cpu_load = "";
+            let hardware_list = &report_data.Children[0].Children;
+            for hardware_item in hardware_list {
+                let sensor_types = &hardware_item.Children;
+                for sensor_type in sensor_types {
+                    if sensor_type.Text != "Temperatures" && sensor_type.Text != "Load" {
+                        continue;
+                    }
+                    let sensors = &sensor_type.Children;
+                    for sensor in sensors {
+                        if sensor.Text == "CPU Package" {
+                            cpu_temp = &sensor.Value;
+                        } else if sensor.Text == "CPU Total" {
+                            cpu_load = &sensor.Value;
+                        } else if !cpu_temp.is_empty() && !cpu_load.is_empty() {
+                            // We got what we wanted
+                            break;
+                        }
+                    }
+                }
+            }
+            if cpu_temp.is_empty() {
+                cpu_temp = "ERR";
+            }
+            if cpu_load.is_empty() {
+                cpu_load = "ERR";
+            }
+            let response_json = json!(
+                {
+                    "cpu_temp": cpu_temp.to_string(),
+                    "cpu_load": cpu_load.to_string()
+                }
+            );
+            let response_json_str = serde_json::to_string(&response_json).unwrap();
+            return Ok(Some(response_json_str));
+        }
+        Err(e) => {
+            println!("{}", body);
+            eprintln!("Error! {:#?}", e);
+            return Ok(Option::None);
+        }
+    }
+}
+
 pub async fn clock_tick_loop(
     queue_sender: UnboundedSender<SystemInstruction>,
+    hud_sender: UnboundedSender<HUDInstruction>,
     bot_config: BotConfig,
 ) {
     let mut interval = tokio::time::interval(Duration::from_millis(1000));
     let mut restart_warn_ticker = -1; // TODO: This needs a way cleaner system
+    let hw_stat_error_val = String::from("{'cpu_temp': 'ERR', 'cpu_load': 'ERR'}");
+    let mut hw_stat_loop = 0;
+    const HW_STAT_LOOP_MAX: i32 = 2;
     loop {
         interval.tick().await;
+
+        // Restart logic
         let restart_return = restart_warn(restart_warn_ticker).await;
         if restart_warn_ticker != restart_return && restart_return != -1 {
             restart_warn_ticker = restart_return;
             restart_logic(queue_sender.clone(), bot_config.clone(), restart_return).await;
+        }
+
+        // Hardware stats logic
+        if hw_stat_loop < HW_STAT_LOOP_MAX {
+            // Only check for/send updates every HW_STAT_LOOP_MAX seconds
+            hw_stat_loop = hw_stat_loop + 1;
+            continue;
+        } else {
+            hw_stat_loop = 0;
+        }
+        let hw_stat_result = get_hardware_data().await;
+        let hw_stat_data: String;
+        match hw_stat_result {
+            Ok(valid_result) => match valid_result {
+                Some(result) => {
+                    hw_stat_data = result;
+                }
+                None => {
+                    eprintln!("[Open Hardware Monitor query failed]");
+                    hw_stat_data = hw_stat_error_val.to_owned();
+                }
+            },
+            Err(_error) => {
+                eprintln!("[Open Hardware Monitor query error]\n{}", _error);
+                hw_stat_data = hw_stat_error_val.to_owned();
+            }
+        }
+        match hud_sender.send(HUDInstruction::SystemMonitorUpdate { data: hw_stat_data }) {
+            Err(_e) => eprintln!("[HUD] System Monitor Update Channel Error"),
+            _ => (),
         }
     }
 }
@@ -2342,6 +2522,13 @@ pub enum HUDInstruction {
     GenericMessage {
         message: String,
     },
+    TimedMessage {
+        message: String,
+        time: u64,
+    },
+    SystemMonitorUpdate {
+        data: String,
+    },
 }
 pub async fn hud_loop(mut hud_receiver: UnboundedReceiver<HUDInstruction>) {
     let mut clients: HashMap<u64, simple_websockets::Responder> = HashMap::new();
@@ -2372,6 +2559,41 @@ pub async fn hud_loop(mut hud_receiver: UnboundedReceiver<HUDInstruction>) {
                 );
                 for (_client_id, client_responder) in &clients {
                     client_responder.send(simple_websockets::Message::Text(message.to_owned()));
+                }
+            }
+            HUDInstruction::TimedMessage { message, time } => {
+                println!(
+                    "[HUD] Sending timed message to all connected clients ({}): {}",
+                    clients.len(),
+                    message
+                );
+                let message_obj = json!({
+                    "type": "timed_message",
+                    "value": {
+                        "seconds": time,
+                        "message": message
+                    }
+                });
+                for (_client_id, client_responder) in &clients {
+                    client_responder
+                        .send(simple_websockets::Message::Text(message_obj.to_string()));
+                }
+            }
+            HUDInstruction::SystemMonitorUpdate { data } => {
+                // println!(
+                //     "[HUD] Sending system monitor update to all connected clients ({}): {}",
+                //     clients.len(),
+                //     data
+                // );
+                let message_obj = json!({
+                    "type": "system_monitor_update",
+                    "value": {
+                        "data": data
+                    }
+                });
+                for (_client_id, client_responder) in &clients {
+                    client_responder
+                        .send(simple_websockets::Message::Text(message_obj.to_string()));
                 }
             }
         }
@@ -2425,6 +2647,9 @@ pub async fn hud_ws_server(hud_sender: UnboundedSender<HUDInstruction>) {
 }
 // END HUD STUFF
 
+// =================
+// [Production Main]
+// =================
 #[tokio::main]
 pub async fn main() {
     dotenv::from_filename("..\\.env").ok();
@@ -2442,9 +2667,11 @@ pub async fn main() {
 
     let twitch_task = twitch_loop(queue_sender.clone(), hud_sender.clone(), bot_config.clone());
     let anti_afk_task = anti_afk_loop(queue_sender.clone(), bot_config.clone());
-    let queue_processor_task = queue_processor(queue_receiver, bot_config.clone());
+    let queue_processor_task =
+        queue_processor(queue_receiver, hud_sender.clone(), bot_config.clone());
     let server_check_task = server_check_loop(queue_sender.clone(), bot_config.clone());
-    let clock_tick_task = clock_tick_loop(queue_sender.clone(), bot_config.clone());
+    let clock_tick_task =
+        clock_tick_loop(queue_sender.clone(), hud_sender.clone(), bot_config.clone());
     let hud_loop_task = hud_loop(hud_receiver);
     let hud_ws_server_task = hud_ws_server(hud_sender.clone());
 
@@ -2460,3 +2687,49 @@ pub async fn main() {
         hud_ws_server_task
     );
 }
+
+//===========
+//[Test Main]
+//===========
+// #[tokio::main]
+// pub async fn main() {
+//     dotenv::from_filename("..\\.env").ok();
+
+//     let bot_config = init_config();
+
+//     let (hud_sender, hud_receiver): (
+//         UnboundedSender<HUDInstruction>,
+//         UnboundedReceiver<HUDInstruction>,
+//     ) = unbounded_channel();
+//     let (queue_sender, queue_receiver): (
+//         UnboundedSender<SystemInstruction>,
+//         UnboundedReceiver<SystemInstruction>,
+//     ) = unbounded_channel();
+
+//     // let twitch_task = twitch_loop(queue_sender.clone(), hud_sender.clone(), bot_config.clone());
+//     // let anti_afk_task = anti_afk_loop(queue_sender.clone(), bot_config.clone());
+//     let queue_processor_task =
+//         queue_processor(queue_receiver, hud_sender.clone(), bot_config.clone());
+//     // let server_check_task = server_check_loop(queue_sender.clone(), bot_config.clone());
+//     let clock_tick_task =
+//         clock_tick_loop(queue_sender.clone(), hud_sender.clone(), bot_config.clone());
+//     let hud_loop_task = hud_loop(hud_receiver);
+//     let hud_ws_server_task = hud_ws_server(hud_sender.clone());
+
+//     // check_active(&bot_config.game_name.to_owned());
+
+//     let (
+//         _r1,
+//         _r2,
+//         _r3,
+//         _r4, // , _r5, _r6, _r7
+//     ) = tokio::join!(
+//         // twitch_task,
+//         // anti_afk_task,
+//         queue_processor_task,
+//         // server_check_task,
+//         clock_tick_task,
+//         hud_loop_task,
+//         hud_ws_server_task
+//     );
+// }

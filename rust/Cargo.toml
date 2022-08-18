@@ -13,7 +13,8 @@ windows-win = "2.4.1"
 twitch-irc = "4.0.0"
 tokio = {version = "1.17.0", features = ["rt-multi-thread", "macros", "full", "sync"]}
 queues = "1.0.2"
-serde_json = "1.0"
+serde_json = "1.0.83"
+serde = { version = "1.0.143", features = ["derive"] }
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 chrono = "0.4.20"
 simple-websockets = "0.1.4"

@@ -2,538 +2,69 @@
 
 <html>
   <head>
-    <style>
-      html {
-        background-color: #fff;
-      }
-      body {
-        width: 1280px;
-        height: 720px;
-        background-color: #555;
-        margin: 0;
-      }
-
-      @font-face {
-        font-family: ArameMonoBold;
-        src: url(fonts/arame/ArameMono-Bold.ttf);
-      }
-      @font-face {
-        font-family: ArameMonoStencil;
-        src: url(fonts/arame/ArameMono-Stencil.ttf);
-      }
-      @font-face {
-        font-family: ArameMonoThin;
-        src: url(fonts/arame/ArameMono-Thin.ttf);
-      }
-      @import url("https://fonts.googleapis.com/css2?family=Red+Hat+Text:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap");
-
-      .main-container {
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        height: 100%;
-        width: 100%;
-      }
-      .main-container > .big-popup-container:not(:first-child) {
-        margin-top: 10px;
-      }
-
-      .default-type {
-        font-family: "Red Hat Text", sans-serif;
-        color: white;
-        font-size: 48px;
-        text-shadow: 0 0 5px white;
-      }
-
-      .big-popup-container {
-        background: rgba(0, 0, 0, 0.9);
-        padding: 10px 20px;
-        border-radius: 10px;
-      }
-
-      /* .hud-connection-loss {
-        font-family: "Red Hat Text", sans-serif;
-        color: rgba(255, 0, 0, 1);
-        text-shadow: 0 0 10px rgba(255, 0, 0, 1);
-        font-weight: 600;
-      } */
-
-      .hud-connection-loss {
-        /* font-family: "Red Hat Text", sans-serif; */
-        font-family: ArameMonoBold;
-        position: absolute;
-        top: 0px;
-        background-color: red;
-        color: white;
-        animation: alert-red 0.6s linear infinite;
-        padding: 0px 10px;
-        border-radius: 2px;
-        text-shadow: 0 0 10px white;
-        text-align: center;
-      }
-
-      .system-error {
-        font-family: ArameMonoThin;
-        position: absolute;
-        font-size: 40px;
-        top: 670px;
-        left: 990px;
-        color: rgba(255, 200, 50, 0.9);
-        text-shadow: -4px 4px 5px rgba(255, 200, 0, 0.7);
-        font-weight: 600;
-        text-align: left;
-      }
-      .system-error {
-        animation: system-error 0.5s linear infinite;
-      }
-
-      /* Animation Stuff */
-      @keyframes system-error {
-        0% {
-          opacity: 0;
-        }
-        49% {
-          opacity: 0;
-        }
-        50% {
-          opacity: 1;
-        }
-        99% {
-          opacity: 1;
-        }
-      }
-      @keyframes alert-red {
-        0% {
-          background-color: rgba(255, 0, 0, 0.5);
-          box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) inset,
-            0px 0px 15px rgba(255, 0, 0, 0.1);
-        }
-        50% {
-          background-color: rgba(255, 0, 0, 1);
-          box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) inset,
-            0px 0px 15px rgba(255, 0, 0, 0.9);
-        }
-        100% {
-          background-color: rgba(255, 0, 0, 0.5);
-          box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) inset,
-            0px 0px 15px rgba(255, 0, 0, 0.1);
-        }
-      }
-
-      .anim-ping-popup {
-        animation-name: ping-popup;
-        animation-duration: 0.5s;
-        animation-timing-function: ease-in-out;
-        animation-fill-mode: forwards;
-      }
-      @keyframes ping-popup {
-        0% {
-          scale: 0;
-        }
-        20% {
-          scale: 0.8;
-        }
-        100% {
-          scale: 1;
-        }
-      }
-      .anim-action-blink {
-        animation-name: action-blink;
-        animation-duration: 0.25s;
-        animation-timing-function: linear;
-      }
-      @keyframes action-blink {
-        0% {
-          opacity: 1;
-        }
-        16% {
-          opacity: 0.2;
-        }
-        33% {
-          opacity: 1;
-        }
-        49% {
-          opacity: 0.2;
-        }
-        66% {
-          opacity: 1;
-        }
-        82% {
-          opacity: 0.2;
-        }
-        100% {
-          opacity: 1;
-        }
-      }
-      .anim-shrink-fade {
-        animation-name: shrink-fade;
-        animation-duration: 0.5s;
-        animation-timing-function: ease-in-out;
-      }
-      @keyframes shrink-fade {
-        0% {
-          scale: 1;
-          opacity: 1;
-        }
-        80% {
-          scale: 0.8;
-          opacity: 0.8;
-        }
-        100% {
-          scale: 0;
-          opacity: 0;
-        }
-      }
-    </style>
-    <style>
-      /*TODO: Sort all this old css code from years back*/
-      .outPopUp {
-        position: absolute;
-        z-index: 15;
-        top: 50%;
-        left: 50%;
-        margin: -100px 0 0 -150px;
-      }
-      .container1 {
-        vertical-align: center;
-        height: 35px;
-        width: 175px;
-        max-height: 500px;
-        border: 3px solid rgba(255, 255, 255, 0.5);
-        background-color: #000000;
-        border-radius: 10px;
-        white-space: nowrap;
-        box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) inset,
-          0px 0px 8px rgba(255, 255, 255, 0.9);
-      }
-
-      .container2 {
-        display: inline-block;
-        width: 499.5px;
-        height: 0px;
-        margin-top: 10px;
-        margin-left: 0.5px;
-        background-color: rgba(100, 100, 100, 0.5);
-        margin-bottom: 10px;
-        font-family: "Red Hat Text", sans-serif;
-        color: white;
-        font-size: 18px;
-      }
-      .default {
-        font-size: 16px;
-        font-family: "Red Hat Text", sans-serif;
-        color: white;
-        font-size: 2.5vw;
-        text-shadow: 0 0 5px white;
-      }
-      .defaultsmall {
-        font-size: 16px;
-        font-family: "Red Hat Text", sans-serif;
-        color: white;
-        font-size: 1.5vw;
-        text-shadow: 0 0 5px white;
-      }
-      .yellow {
-        color: yellow;
-        text-shadow: 0 0 5px yellow;
-      }
-      .orange {
-        color: orange;
-        text-shadow: 0 0 5px orange;
-      }
-      @media (max-width: 800px) {
-        .default {
-          font-size: 12vw;
-          white-space: nowrap;
-        }
-        .defaultsmall {
-          font-size: 6vw;
-          white-space: nowrap;
-        }
-      }
-      .containertext {
-        margin-left: 2px;
-        text-shadow: 0 0 5px white;
-      }
-
-      #networkstatusdiv > a {
-        text-shadow: 0 0 10px white;
-      }
-      .headerwarning {
-        font-family: "Red Hat Text", sans-serif;
-        color: yellow;
-        font-size: 23px;
-        font-weight: 500;
-        text-shadow: 0 0 15px yellow;
-      }
-      .headeralert {
-        font-family: "Red Hat Text", sans-serif;
-        color: red;
-        font-size: 23px;
-        font-weight: 500;
-        text-shadow: 0 0 15px red;
-      }
-      .headericon {
-        font-family: "Red Hat Text", sans-serif;
-        color: white;
-        font-size: 15px;
-        font-weight: 300;
-        margin-left: 10px;
-        margin-top: -2px;
-        top: -20px !important;
-        opacity: 0.5;
-        animation: headericon 0.6s ease infinite;
-      }
-      .dots {
-        animation: dots 3s linear infinite alternate;
-      }
-      .failure {
-        color: rgba(255, 0, 0, 1);
-        text-shadow: 0 0 10px rgba(255, 0, 0, 1);
-        font-weight: 600;
-      }
-      .alert {
-        background-color: red;
-        color: white;
-        animation: alert 0.6s linear infinite;
-        margin-left: 5px;
-        margin-right: 5px;
-        border-radius: 5px;
-        width: 105%;
-        height: 105%;
-        text-shadow: 0 0 10px white;
-        text-align: center;
-      }
-      .success {
-        color: rgba(60, 220, 130, 1);
-        text-shadow: 0 0 10px rgba(60, 220, 130, 1);
-      }
-      @keyframes headericon {
-        0% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.4;
-        }
-        100% {
-          opacity: 1;
-        }
-      }
-      @keyframes dots {
-        0% {
-          content: ".";
-        }
-        33% {
-          content: "..";
-        }
-        66% {
-          content: "...";
-        }
-        100% {
-          content: ".";
-        }
-      }
-      .container1grow {
-        animation-name: container1;
-        animation-duration: 0.5s;
-        animation-delay: 0.25s;
-        animation-timing-function: ease-out;
-        animation-fill-mode: forwards;
-      }
-      @keyframes container1 {
-        0% {
-          height: 35px;
-        }
-        50% {
-          height: 150px;
-          width: 501px;
-          left: 43%;
-        }
-        100% {
-          height: 150px;
-          width: 501px;
-          left: 43%;
-        }
-      }
-      .container1shrink {
-        animation: container1shrink 0.25s linear;
-        animation-fill-mode: forwards;
-      }
-      @keyframes container1shrink {
-        0% {
-          height: 150px;
-          width: 501px;
-        }
-        100% {
-          height: 35px;
-          width: 235px;
-        }
-      }
-      @keyframes container2 {
-        0% {
-          height: 0px;
-        }
-        50% {
-          height: 100px;
-        }
-        100% {
-          height: 100px;
-        }
-      }
-
-      .container2grow {
-        animation-name: container2;
-        animation-duration: 0.5s;
-        animation-delay: 0.5s;
-        animation-timing-function: ease-out;
-        animation-fill-mode: forwards;
-      }
-      .container2shrink {
-        animation: container2shrink 0.25s linear;
-        animation-fill-mode: forwards;
-      }
-      @keyframes container2shrink {
-        0% {
-          height: 100px;
-        }
-        100% {
-          height: 0px;
-          width: 235px;
-        }
-      }
-      @keyframes alert {
-        0% {
-          background-color: rgba(255, 0, 0, 0);
-          box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) inset,
-            0px 0px 15px rgba(255, 0, 0, 0.1);
-        }
-        50% {
-          background-color: rgba(255, 0, 0, 1);
-          box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) inset,
-            0px 0px 15px rgba(255, 0, 0, 0.9);
-        }
-        100% {
-          background-color: rgba(255, 0, 0, 0);
-          box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.1) inset,
-            0px 0px 15px rgba(255, 0, 0, 0.1);
-        }
-      }
-    </style>
-    <script type="text/javascript" defer>
-      function get_random_id() {
-        // Don't use this for cryptography :)
-        return `${Date.now()}${Math.random()}`;
-      }
-      function type_writer(message, element) {
-        speed = 400 / message.length;
-        let i = 0;
-        function _type_writer() {
-          if (i < message.length) {
-            element.innerHTML += message.charAt(i);
-            i++;
-            setTimeout(_type_writer, speed);
-          }
-        }
-        _type_writer();
-      }
-      function show_ping(message) {
-        const id = get_random_id();
-
-        let ping_text = document.createElement("div");
-        ping_text.className = "default-type";
-        // ping_text.innerText = message;
-        ping_text.id = `ping-text-${id}`;
-
-        let ping_container = document.createElement("div");
-        ping_container.className = "big-popup-container anim-ping-popup";
-        ping_container.id = `ping-container-${id}`;
-        ping_container.appendChild(ping_text);
-
-        const main_container = document.getElementById("main-container");
-        main_container.appendChild(ping_container);
-        type_writer(message, ping_text);
+    <meta
+      name="viewport"
+      content="width=720, height=1280, initial-scale=1, user-scalable=no"
+    />
+    <link rel="stylesheet" type="text/css" href="./main.css" />
+    <link rel="stylesheet" type="text/css" href="./animations.css" />
+    <script type="text/javascript" defer src="./script.js"></script>
+    <!-- <script defer>
+      window.onload = (event) => {
+        show_timed_popup("LAUNCHING SELENIUM", 3);
         setTimeout(function () {
-          ping_text.classList.add("anim-action-blink");
-          var audio = new Audio("autoaimon.mp3");
-          audio.play();
-          setTimeout(function () {
-            ping_container.classList.add("anim-shrink-fade");
-            setTimeout(function () {
-              ping_container.remove();
-            }, 600);
-          }, 2000);
-        }, 500);
-      }
-      function activate_hud_error(status) {
-        let visibility = status ? "visible" : "hidden";
-        document.getElementById("system-error").style.visibility = visibility;
-        document.getElementById("hud-connection-loss").style.visibility =
-          visibility;
-      }
-
-      function connect() {
-        let socket = new WebSocket("ws://127.0.0.1:8080");
-        let connection_established = false;
-        socket.onopen = function (e) {
-          console.log("[WS] Connection established");
-          connection_established = true;
-          activate_hud_error(false);
-          setTimeout(function () {
-            // sanity
-            activate_hud_error(false);
-          }, 500);
-        };
-
-        socket.onmessage = function (event) {
-          console.log(`[WS] Data received from server: ${event.data}`);
-          if (event.data == "ping") {
-            show_ping("PING RECEIVED");
-          }
-        };
-
-        socket.onclose = function (event) {
-          if (event.wasClean) {
-            console.log(
-              `[WS] Connection closed cleanly, code=${event.code} reason=${event.reason}`
-            );
-          } else {
-            if (connection_established) {
-              console.log("[WS] Connection died");
-            } else {
-              console.log("[WS] Failed to connect, retrying...");
-            }
-            activate_hud_error(true);
-            setTimeout(function () {
-              connect();
-            }, 250);
-          }
-        };
-
-        socket.onerror = function (error) {
-          if (connection_established) {
-            console.log(`[WS] ${error.message}`);
-          }
-        };
-      }
-      connect();
-    </script>
+          show_timed_popup("CHECKING FOR BETTER SERVER", 3);
+        }, 2000);
+      };
+    </script> -->
   </head>
   <body>
-    <div class="main-container" id="main-container">
-      <!-- <div class="big-popup-container anim-ping-popup">
-        <div class="default-type">PING RECEIVED</div>
-      </div> -->
+    <div id="relative-main-container">
+      <div id="flex-main-container">
+        <!-- <div class="big-popup-container anim-ping-popup" id="test-ping">
+        <div class="popup-row">
+          <div class="default-type">PING RECEIVED</div>
+        </div>-->
+        <div
+          class="anim-alert-red"
+          id="hud-connection-loss"
+          style="visibility: hidden"
+        >
+          HUD CONNECTION LOST
+        </div>
+      </div>
       <div
-        class="hud-connection-loss"
-        id="hud-connection-loss"
+        class="anim-stepped-blink"
+        id="system-error"
         style="visibility: hidden"
       >
-        HUD CONNECTION LOST
-      </div>
-      <div class="system-error" id="system-error" style="visibility: hidden">
         SYSTEM ERROR
+      </div>
+      <div id="bottom-right-container">
+        <div id="date-version-container">
+          <div id="date-text">
+            <span id="date-label">DAY </span><span id="date-value">###</span>
+          </div>
+          <div id="version-text">
+            <span id="version-label">v</span><span id="version-value">##</span>
+          </div>
+        </div>
+        <div id="clock-container">
+          <span id="clock-text">##:##:## XX</span
+          ><span id="clock-timezone"> EST</span>
+        </div>
+        <div id="hw-stats-container">
+          <div id="hw-stats-cpu-temp">
+            <span id="hw-stats-cpu-temp-label">TEMP: </span
+            ><span id="hw-stats-cpu-temp-value">---</span
+            ><span id="hw-stats-cpu-temp-unit">C&deg;</span>
+          </div>
+          <div id="hw-stats-cpu-load">
+            <span id="hw-stats-cpu-load-label">LOAD: </span
+            ><span id="hw-stats-cpu-load-value">---</span
+            ><span id="hw-stats-cpu-load-unit">%</span>
+          </div>
+        </div>
       </div>
     </div>
   </body>
