@@ -621,15 +621,13 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
     tp_locations.insert(String::from("ruins"), String::from("Ruins"));
     tp_locations.insert(String::from("shrimp"), String::from("Shreimp Mart"));
     tp_locations.insert(String::from("sky"), String::from("Floating Island"));
-    tp_locations.insert(
-        String::from("tictactoe"),
-        String::from("ultimate tic tac toe"),
-    );
     tp_locations.insert(String::from("fire"), String::from("Fireside Island"));
     tp_locations.insert(String::from("beach"), String::from("Beach"));
     tp_locations.insert(String::from("devil"), String::from("Scarlet Devil Mansion"));
     tp_locations.insert(String::from("highway"), String::from("Highway"));
-    tp_locations.insert(String::from("rat"), String::from("Rat Sewers"));
+    tp_locations.insert(String::from("sewers"), String::from("Rat Sewers"));
+    tp_locations.insert(String::from("mines"), String::from("Rat Mines"));
+    tp_locations.insert(String::from("cave"), String::from("Cave"));
 
     let valid_tp_locations = tp_locations
         .keys()
@@ -712,12 +710,25 @@ pub async fn twitch_loop(
                             let _discord_webook_result =
                                 discord_log(&message, &msg.sender.name, true).await;
 
-                            if (message.starts_with("/") && !(message.starts_with("/e")))
-                                || message.starts_with("[")
+                            let mut author_name = msg.sender.name.to_string();
+
+                            // TODO: config-held, env-driven array of mods
+                            let mod_1 = env::var("TWITCH_MOD_1")
+                                .expect("$TWITCH_MOD_1 is not set")
+                                .to_lowercase();
+
+                            let is_mod: bool = author_name.to_lowercase() == mod_1.to_lowercase();
+
+                            if !is_mod
+                                && ((message.starts_with("/")
+                                    && !(message.starts_with("/e"))
+                                    && !(message.starts_with("/animspeed")))
+                                    || message.starts_with("["))
                             {
+                                // Disable command usage for non-mods
                                 client
                                     .reply_to_privmsg(
-                                        String::from("[You cannot run commands other than /e!]"),
+                                        String::from("[You cannot run commands other than /e or /animspeed!]"),
                                         &msg,
                                     )
                                     .await
@@ -725,9 +736,7 @@ pub async fn twitch_loop(
                                 continue;
                             }
 
-                            let mut author_name = msg.sender.name.to_string();
-
-                            // TODO: config option for this
+                            // TODO: json file for this
                             if author_name.to_lowercase() == "sbfcam" {
                                 author_name = "[CamDev]".to_string();
                             }
@@ -796,6 +805,64 @@ pub async fn twitch_loop(
                                     Err(_e) => eprintln!("User Chat Channel Error"),
                                     _ => (),
                                 }
+                            }
+                        }
+                        "a" => {
+                            let mod_1 = env::var("TWITCH_MOD_1")
+                                .expect("$TWITCH_MOD_1 is not set")
+                                .to_lowercase();
+
+                            let author_name = msg.sender.name.to_string().to_lowercase();
+
+                            if author_name.to_lowercase() != mod_1.to_lowercase() {
+                                client
+                                    .reply_to_privmsg(
+                                        String::from("[You do not have permissions to run this!]"),
+                                        &msg,
+                                    )
+                                    .await
+                                    .unwrap();
+                                continue;
+                            }
+
+                            let mut msg_args = clean_args.to_owned();
+                            msg_args.drain(0..1);
+                            let message = msg_args.join(" ");
+                            if message.len() == 0 {
+                                client
+                                    .reply_to_privmsg(
+                                        String::from("[Specify a message! (i.e. !a hello)]"),
+                                        &msg,
+                                    )
+                                    .await
+                                    .unwrap();
+                                continue;
+                            }
+
+                            let capitalized_message = capitalize_string(&message);
+                            let formatted_message = format!("[{}]", capitalized_message);
+                            println!("Sending announce\n{}", formatted_message);
+                            let announce_instructions = SystemInstruction {
+                                client: Some(client.clone()),
+                                chat_message: Some(msg.to_owned()),
+                                instructions: vec![
+                                    InstructionPair {
+                                        execution_order: 0,
+                                        instruction: Instruction::CheckActive {
+                                            window_title: bot_config.game_name.to_owned(),
+                                        },
+                                    },
+                                    InstructionPair {
+                                        execution_order: 1,
+                                        instruction: Instruction::SystemChatMessage {
+                                            message: formatted_message,
+                                        },
+                                    },
+                                ],
+                            };
+                            match queue_sender.send(announce_instructions) {
+                                Err(_e) => eprintln!("Announce Command Channel Error"),
+                                _ => (),
                             }
                         }
                         "dev" => {
@@ -1685,7 +1752,7 @@ pub async fn anti_afk_loop(
                 },
                 InstructionPair {
                     execution_order: 1,
-                    instruction: Instruction::SystemChatMessage { message: "You can control this bot live on T witch! Go to t witch.tv and and search my username (without the underscore/number)".to_string()},
+                    instruction: Instruction::SystemChatMessage { message: "You can control this bot live on T witch! Go to t witch.tv and search my username (without the underscore/number)".to_string()},
                 },
             ],
         };
@@ -2425,7 +2492,8 @@ fn cv_get_backpack_hover(window_title: &str) -> bool {
     mouse_move(&mut enigo, 0.47, 0.95);
     thread::sleep(DELAY);
     mouse_move(&mut enigo, 0.47, 0.95);
-    return get_pixel(690, 669, 10, 5, 173, 173, 173);
+    println!("cv_get_backpack_hover");
+    return get_pixel(691, 669, 9, 5, 179, 179, 179);
 }
 fn cv_get_navbar(window_title: &str) -> bool {
     check_active(window_title);
@@ -2434,7 +2502,8 @@ fn cv_get_navbar(window_title: &str) -> bool {
     mouse_move(&mut enigo, 0.47, 0.99);
     thread::sleep(DELAY);
     mouse_move(&mut enigo, 0.47, 0.99);
-    return get_pixel(690, 669, 10, 5, 246, 246, 246);
+    println!("cv_get_navbar");
+    return get_pixel(691, 669, 9, 5, 255, 255, 255);
 }
 fn cv_get_navbar_hidden(window_title: &str) -> bool {
     check_active(&window_title);
@@ -2443,7 +2512,8 @@ fn cv_get_navbar_hidden(window_title: &str) -> bool {
     mouse_hide(&mut enigo);
     thread::sleep(DELAY);
     mouse_hide(&mut enigo);
-    return !(get_pixel(690, 669, 10, 5, 246, 246, 246));
+    println!("cv_get_navbar_hidden");
+    return !(get_pixel(691, 669, 9, 5, 255, 255, 255));
 }
 
 fn cv_check_loaded_in(window_title: &str) -> bool {
