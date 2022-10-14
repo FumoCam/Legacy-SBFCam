@@ -343,12 +343,12 @@ function update_loop(animation_speed_ms) {
 
 function changelog() {
   // START CHANGE-ME
-  const VERSION = 16;
-  const UPDATE_DATE = "2022-08-18";
+  const VERSION = 17;
+  const UPDATE_DATE = "2022-10-14";
   const UPDATE_ITEMS = [
-    "Added epoch day, time, and version to HUD",
-    "Added temp/load monitoring to HUD",
-    "Added changelog to HUD",
+    "Implemented Chat Censor Service",
+    "USE !dev IF SOMETHING BROKE WITH CHAT",
+    "If you cant do/say something you could before, use !dev",
   ];
   // END CHANGE-ME
   animateNumericalValue(

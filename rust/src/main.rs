@@ -638,6 +638,52 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
     return (tp_locations, valid_tp_locations);
 }
 
+#[allow(non_snake_case)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct CensorClientReturn {
+    username: String,
+    message: String,
+    bot_reply_message: Vec<String>,
+    send_users_message: bool,
+}
+pub async fn get_chat(
+    username: String,
+    message: String,
+) -> Result<Option<CensorClientReturn>, Box<dyn Error>> {
+    let api_url: String = String::from("http://127.0.0.1:8086/request_censored_message");
+    let request_body = json!({
+        "username": username,
+        "message": message
+    });
+
+    let client = reqwest::Client::new();
+    let response = client.post(api_url).json(&request_body).send().await?;
+
+    if !(&response.status().is_success()) {
+        let error_message: String = format!(
+            "[Censor Client Error - Response Status]\n```{}```",
+            response.text().await?
+        );
+        eprint!("{}", &error_message);
+        let _ = notify_admin(&error_message).await;
+        return Ok(Option::None);
+    }
+    let body = response.text().await?;
+
+    match serde_json::from_str::<CensorClientReturn>(&body) {
+        Ok(return_data) => {
+            return Ok(Some(return_data));
+        }
+        Err(e) => {
+            let error_message: String =
+                format!("[Censor Client Error - JSON]\n{:#?}\n```{}```", e, body);
+            eprint!("{}", &error_message);
+            let _ = notify_admin(&error_message).await;
+            return Ok(Option::None);
+        }
+    }
+}
+
 pub async fn twitch_loop(
     queue_sender: UnboundedSender<SystemInstruction>,
     hud_sender: UnboundedSender<HUDInstruction>,
@@ -710,7 +756,7 @@ pub async fn twitch_loop(
                             let _discord_webook_result =
                                 discord_log(&message, &msg.sender.name, true).await;
 
-                            let mut author_name = msg.sender.name.to_string();
+                            let author_name = msg.sender.name.to_string();
 
                             // TODO: config-held, env-driven array of mods
                             let mod_1 = env::var("TWITCH_MOD_1")
@@ -736,12 +782,6 @@ pub async fn twitch_loop(
                                 continue;
                             }
 
-                            // TODO: json file for this
-                            if author_name.to_lowercase() == "sbfcam" {
-                                author_name = "[CamDev]".to_string();
-                            }
-
-                            let author_msg = format!("{}:", author_name);
                             println!("{}: {}", author_name.to_lowercase(), message);
 
                             let success = check_active(&bot_config.game_name);
@@ -757,7 +797,10 @@ pub async fn twitch_loop(
                                 continue;
                             }
                             if message.starts_with("/") {
-                                println!("Sending chat command from '{}'\n{}", author_msg, message);
+                                println!(
+                                    "Sending chat command from '{}'\n{}",
+                                    author_name, message
+                                );
                                 let chat_command_instructions = SystemInstruction {
                                     client: Some(client.clone()),
                                     chat_message: Some(msg.to_owned()),
@@ -781,7 +824,47 @@ pub async fn twitch_loop(
                                     _ => (),
                                 }
                             } else {
-                                println!("Sending chat message\n{}: {}", author_msg, message);
+                                println!("Sending chat message\n{}: {}", author_name, message);
+                                let chat_result_raw = get_chat(author_name, message).await;
+                                let mut chat_result: CensorClientReturn;
+                                match chat_result_raw {
+                                    Ok(valid_result) => match valid_result {
+                                        Some(result) => {
+                                            chat_result = result;
+                                        }
+                                        None => {
+                                            client.reply_to_privmsg(String::from("[Something went wrong, can't send a message. Contacting dev...]"), &msg).await.unwrap();
+                                            continue;
+                                        }
+                                    },
+                                    Err(_error) => {
+                                        let error_message: String = format!(
+                                            "[Censor Client Error - Main]\n```{:#?}```",
+                                            _error
+                                        );
+                                        eprint!("{}", &error_message);
+                                        let _ = notify_admin(&error_message).await;
+
+                                        client.reply_to_privmsg(String::from("[Something went wrong, can't send a message. Contacting dev...]"), &msg).await.unwrap();
+                                        continue;
+                                    }
+                                }
+                                for bot_message in &chat_result.bot_reply_message {
+                                    println!("Replying: '{}'", bot_message);
+                                    client
+                                        .reply_to_privmsg(bot_message.to_owned(), &msg)
+                                        .await
+                                        .unwrap();
+                                }
+
+                                if !chat_result.send_users_message {
+                                    continue;
+                                }
+                                let censored_username: String =
+                                    format!("{}:", chat_result.username);
+                                let censored_message: String = format!("{}", chat_result.message);
+                                println!("{}: {}", censored_username, censored_message);
+
                                 let chat_command_instructions = SystemInstruction {
                                     client: Some(client.clone()),
                                     chat_message: Some(msg.to_owned()),
@@ -795,8 +878,8 @@ pub async fn twitch_loop(
                                         InstructionPair {
                                             execution_order: 1,
                                             instruction: Instruction::UserChatMessage {
-                                                message: message,
-                                                author: author_msg,
+                                                message: censored_message,
+                                                author: censored_username,
                                             },
                                         },
                                     ],
