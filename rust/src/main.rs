@@ -1,5 +1,14 @@
+#![warn(clippy::pedantic)]
+#![allow(
+    clippy::missing_panics_doc,
+    clippy::cast_sign_loss,
+    clippy::missing_errors_doc,
+    clippy::too_many_lines,
+    clippy::cast_possible_wrap,
+    clippy::cast_possible_truncation,
+    clippy::items_after_statements
+)]
 use chrono::Timelike;
-use dotenv;
 use enigo::{Enigo, Key, KeyboardControllable, MouseButton, MouseControllable};
 use serde_json::json;
 use std::cmp::Ordering;
@@ -18,11 +27,9 @@ use twitch_irc::transport::tcp::TCPTransport;
 use twitch_irc::transport::tcp::TLS;
 use twitch_irc::TwitchIRCClient;
 use twitch_irc::{ClientConfig, SecureTCPTransport};
-use winapi;
-use windows_win;
 
 fn capitalize_string(s: &str) -> String {
-    return s[0..1].to_uppercase() + &s[1..];
+    s[0..1].to_uppercase() + &s[1..]
 }
 
 fn move_direction(direction: &str, duration: f64) {
@@ -70,7 +77,7 @@ fn camera_x(x_ratio: f32) {
 fn camera_y(y_ratio: f32) {
     const DELAY: Duration = Duration::from_millis(300);
     let mut enigo = Enigo::new();
-    const EULER_MOUSEY_MULTI: f32 = 2.861111; // 180 * this will rotate up/down 100%
+    const EULER_MOUSEY_MULTI: f32 = 2.861_111; // 180 * this will rotate up/down 100%
     let y_amount = (EULER_MOUSEY_MULTI * y_ratio).round() as i32;
     mouse_move(&mut enigo, 0.5, 0.5);
     thread::sleep(DELAY);
@@ -160,7 +167,7 @@ fn send_system_chat(msg: &str) {
 
     enigo.key_click(Key::Layout('/'));
     thread::sleep(type_delay);
-    if msg.starts_with("/") {
+    if msg.starts_with('/') {
         // Chat command
         enigo.key_sequence(msg.as_ref());
     } else {
@@ -220,7 +227,7 @@ async fn discord_log(
     } else {
         "DISCORD_LOG_WEBHOOK_URL"
     };
-    let webhook_url = env::var(env_key).expect(&format!("{} is not set", env_key));
+    let webhook_url = env::var(env_key).unwrap_or_else(|_| panic!("{} is not set", env_key));
     let webhook_data = json!({
         "embeds": [
             {
@@ -255,21 +262,13 @@ async fn notify_admin(
     let _resp = client.post(webhook_url).json(&webhook_data).send().await?;
     Ok(())
 }
-
-fn join_server(game_id: i64, server_id: &str) {
-    match join_game_selenium(game_id.to_owned(), server_id) {
-        Err(_e) => eprintln!("Selenium Error\n{}", _e),
-        _ => (),
-    }
-}
-
 fn check_active(window_title: &str) -> bool {
     if get_active_window() != window_title {
         show_window_by_title(window_title);
         thread::sleep(Duration::from_millis(500));
         return get_active_window() == window_title;
     }
-    return true;
+    true
 }
 
 fn get_active_window() -> String {
@@ -286,26 +285,23 @@ fn get_active_window() -> String {
     if writ_chars == 0 {
         return "Error".to_string();
     }
-    return String::from_utf16_lossy(&buffer[0..writ_chars as usize]);
+    String::from_utf16_lossy(&buffer[0..writ_chars as usize])
 }
 fn show_window_by_title(title: &str) -> bool {
     let window_hwnd_ref_vec = windows_win::raw::window::get_by_title(title, None).unwrap();
     let window_hwnd_ref = window_hwnd_ref_vec.first();
-    match window_hwnd_ref {
-        Some(window_hwnd_ref) => {
-            let window_hwnd_raw = *window_hwnd_ref;
-            let success = show_window(window_hwnd_raw);
-            if success {
-                println!("Successfully activated {title}!", title = title);
-            } else {
-                eprintln!("Issue in activating {title}", title = title);
-            }
-            return success;
+    if let Some(window_hwnd_ref) = window_hwnd_ref {
+        let window_hwnd_raw = *window_hwnd_ref;
+        let success = show_window(window_hwnd_raw);
+        if success {
+            println!("Successfully activated {title}!", title = title);
+        } else {
+            eprintln!("Issue in activating {title}", title = title);
         }
-        None => {
-            eprintln!("Couldn't find a window by the name {title}", title = title);
-            return false;
-        }
+        success
+    } else {
+        eprintln!("Couldn't find a window by the name {title}", title = title);
+        false
     }
 }
 fn show_window(raw_window_hwnd_ref: *mut winapi::shared::windef::HWND__) -> bool {
@@ -323,7 +319,7 @@ fn show_window(raw_window_hwnd_ref: *mut winapi::shared::windef::HWND__) -> bool
         if !maximize_success {
             println!("Issue in maximize operation");
         }
-        return minimize_success && maximize_success;
+        minimize_success && maximize_success
     }
 }
 fn trigger_restart() {
@@ -339,7 +335,7 @@ fn trigger_restart() {
 fn terminate_running_exe(exe_name: &str) {
     println!("EXE termination subprocess started ({})", exe_name);
     let output = Command::new("cmd")
-        .args(["/C", "taskkill", "/f", "/IM", &exe_name])
+        .args(["/C", "taskkill", "/f", "/IM", exe_name])
         .output()
         .expect("failed to execute Roblox termination");
     println!("EXE termination subprocess finished ({})", exe_name);
@@ -455,15 +451,15 @@ pub async fn queue_processor(
                         instruction_history.push(history_entry);
                     }
 
-                    success = check_active(&window_title);
+                    success = check_active(window_title);
                     if !success {
-                        let _ = notify_admin("Failed to find Roblox!").await;
+                        notify_admin("Failed to find Roblox!").await.ok();
                         if let (Some(client), Some(chat_message)) = (&client_opt, &chat_message_opt)
                         {
                             client
                                 .reply_to_privmsg(
                                     String::from("[Failed to find Roblox! Notified dev.]"),
-                                    &chat_message,
+                                    chat_message,
                                 )
                                 .await
                                 .unwrap();
@@ -477,7 +473,7 @@ pub async fn queue_processor(
                         instruction_history.clear(); // Reset instruction history per-warp
                     }
                     instruction_history.push(history_entry); // Record even if system-requested
-                    run_console_command(&command);
+                    run_console_command(command);
                 }
                 Instruction::HideMouse {} => {
                     println!("hide_mouse");
@@ -544,7 +540,7 @@ pub async fn queue_processor(
                     if client_origin {
                         instruction_history.push(history_entry);
                     }
-                    send_system_chat(&message);
+                    send_system_chat(message);
                 }
                 Instruction::TerminateGame {} => {
                     println!("terminate_game");
@@ -555,7 +551,7 @@ pub async fn queue_processor(
                     if client_origin {
                         instruction_history.push(history_entry);
                     }
-                    send_user_chat(&author, &message);
+                    send_user_chat(author, message);
                 }
                 Instruction::Wait { amount_ms } => {
                     println!("wait {}", amount_ms);
@@ -565,12 +561,11 @@ pub async fn queue_processor(
                 Instruction::WaitWithMessage { amount_ms, message } => {
                     println!("wait_with_message {} {}", amount_ms, message);
 
-                    match hud_sender.send(HUDInstruction::TimedMessage {
-                        message: message.to_string(),
-                        time: amount_ms.to_owned(),
+                    if let Err(_e) = hud_sender.send(HUDInstruction::TimedMessage {
+                        message: message.clone(),
+                        time: *amount_ms,
                     }) {
-                        Err(_e) => eprintln!("HUD Channel Error"),
-                        _ => (),
+                        eprintln!("HUD Channel Error");
                     }
                     let duration = tokio::time::Duration::from_millis(*amount_ms);
                     tokio::time::sleep(duration).await;
@@ -587,12 +582,12 @@ pub async fn queue_processor(
                 }
                 Instruction::JoinServer { server_id } => {
                     // Deliberately synchronous/blocking
-                    println!("join_server {}", &server_id);
-                    join_server(bot_config.game_id.to_owned(), &server_id);
-                    let loaded_in = cv_check_loaded_in(&bot_config.game_name.to_owned());
+                    println!("join_game_selenium {}", &server_id);
+                    join_game_selenium(bot_config.game_id, server_id);
+                    let loaded_in = cv_check_loaded_in(&bot_config.game_name.clone());
                     println!("Loaded in: {}", loaded_in);
                     if !loaded_in {
-                        let _ = notify_admin("Failed to load in!").await;
+                        notify_admin("Failed to load in!").await.ok();
                     }
                 }
             }
@@ -604,6 +599,7 @@ pub async fn queue_processor(
     }
 }
 
+#[must_use]
 pub fn get_warp_locations() -> (HashMap<String, String>, String) {
     // TODO: Make this less awful
     let mut tp_locations = HashMap::new();
@@ -635,7 +631,7 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
         .collect::<Vec<_>>()
         .join(", ");
 
-    return (tp_locations, valid_tp_locations);
+    (tp_locations, valid_tp_locations)
 }
 
 #[allow(non_snake_case)]
@@ -665,21 +661,19 @@ pub async fn get_chat(
             response.text().await?
         );
         eprint!("{}", &error_message);
-        let _ = notify_admin(&error_message).await;
+        notify_admin(&error_message).await.ok();
         return Ok(Option::None);
     }
     let body = response.text().await?;
 
     match serde_json::from_str::<CensorClientReturn>(&body) {
-        Ok(return_data) => {
-            return Ok(Some(return_data));
-        }
+        Ok(return_data) => Ok(Some(return_data)),
         Err(e) => {
             let error_message: String =
                 format!("[Censor Client Error - JSON]\n{:#?}\n```{}```", e, body);
             eprint!("{}", &error_message);
-            let _ = notify_admin(&error_message).await;
-            return Ok(Option::None);
+            notify_admin(&error_message).await.ok();
+            Ok(Option::None)
         }
     }
 }
@@ -690,8 +684,8 @@ pub async fn twitch_loop(
     bot_config: BotConfig,
 ) {
     let twitch_config = ClientConfig::new_simple(StaticLoginCredentials::new(
-        bot_config.twitch_bot_username.to_owned(),
-        Some(bot_config.twitch_bot_token.to_owned()),
+        bot_config.twitch_bot_username.clone(),
+        Some(bot_config.twitch_bot_token.clone()),
     ));
     let (mut incoming_messages, raw_client) =
         TwitchIRCClient::<SecureTCPTransport, StaticLoginCredentials>::new(twitch_config);
@@ -700,1036 +694,989 @@ pub async fn twitch_loop(
     let client = &rc_client;
 
     //Begin Async Loop
-    match client.join(bot_config.twitch_channel_name.to_owned()) {
+    match client.join(bot_config.twitch_channel_name.clone()) {
         Ok(join) => join,
         Err(error) => panic!("Could not join the channel {:?}", error),
     }
     while let Some(message) = incoming_messages.recv().await {
-        match message {
-            ServerMessage::Privmsg(msg) => {
-                println!("{}: {}", msg.sender.name, msg.message_text);
-                if msg.message_text.starts_with("!") {
-                    let args = msg.message_text.replacen("!", "", 1);
-                    let clean_args: Vec<&str> = args.split_whitespace().collect();
-                    if clean_args.len() < 1 {
-                        continue;
-                    }
-                    let trigger = clean_args[0].to_lowercase();
-                    match trigger.as_ref() {
-                        "ping" => {
-                            match hud_sender.send(HUDInstruction::GenericMessage {
-                                message: "ping".to_string(),
-                            }) {
-                                Err(_e) => eprintln!("HUD Channel Error"),
-                                _ => (),
-                            }
-                            client
-                                .reply_to_privmsg(String::from("pong"), &msg)
-                                .await
-                                .unwrap();
+        if let ServerMessage::Privmsg(msg) = message {
+            println!("{}: {}", msg.sender.name, msg.message_text);
+            if msg.message_text.starts_with('!') {
+                let args = msg.message_text.replacen('!', "", 1);
+                let clean_args: Vec<&str> = args.split_whitespace().collect();
+                if clean_args.is_empty() {
+                    continue;
+                }
+                let trigger = clean_args[0].to_lowercase();
+                match trigger.as_ref() {
+                    "ping" => {
+                        if let Err(_e) = hud_sender.send(HUDInstruction::GenericMessage {
+                            message: "ping".to_string(),
+                        }) {
+                            eprintln!("HUD Channel Error");
                         }
-                        "help" => {
+                        client
+                            .reply_to_privmsg(String::from("pong"), &msg)
+                            .await
+                            .unwrap();
+                    }
+                    "help" => {
+                        client
+                            .reply_to_privmsg(
+                                format!(
+                                    "For a full list of commands, visit {} . If you just want to play around, try '!m hello', '!move w 2', or '!warp poolside'",
+                                    "https://sbf.fumocam.xyz/commands"
+                                ),
+                                &msg,
+                            )
+                            .await.unwrap();
+                    }
+                    "m" => {
+                        let mut msg_args = clean_args.clone();
+                        msg_args.drain(0..1);
+                        let message = msg_args.join(" ");
+                        if message.is_empty() {
                             client
                                 .reply_to_privmsg(
-                                    format!(
-                                        "For a full list of commands, visit {} . If you just want to play around, try '!m hello', '!move w 2', or '!warp poolside'",
-                                        "https://sbf.fumocam.xyz/commands"
+                                    String::from("[Specify a message! (i.e. !m hello)]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        let _discord_webook_result =
+                            discord_log(&message, &msg.sender.name, true).await;
+
+                        let author_name = msg.sender.name.to_string();
+
+                        // TODO: config-held, env-driven array of mods
+                        let mod_1 = env::var("TWITCH_MOD_1")
+                            .expect("$TWITCH_MOD_1 is not set")
+                            .to_lowercase();
+
+                        let is_mod: bool = author_name.to_lowercase() == mod_1.to_lowercase();
+
+                        if !is_mod
+                            && ((message.starts_with('/')
+                                && !(message.starts_with("/e"))
+                                && !(message.starts_with("/animspeed")))
+                                || message.starts_with('['))
+                        {
+                            // Disable command usage for non-mods
+                            client
+                                .reply_to_privmsg(
+                                    String::from(
+                                        "[You cannot run commands other than /e or /animspeed!]",
                                     ),
                                     &msg,
                                 )
-                                .await.unwrap();
+                                .await
+                                .unwrap();
+                            continue;
                         }
-                        "m" => {
-                            let mut msg_args = clean_args.to_owned();
-                            msg_args.drain(0..1);
-                            let message = msg_args.join(" ");
-                            if message.len() == 0 {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from("[Specify a message! (i.e. !m hello)]"),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            let _discord_webook_result =
-                                discord_log(&message, &msg.sender.name, true).await;
 
-                            let author_name = msg.sender.name.to_string();
+                        println!("{}: {}", author_name.to_lowercase(), message);
 
-                            // TODO: config-held, env-driven array of mods
-                            let mod_1 = env::var("TWITCH_MOD_1")
-                                .expect("$TWITCH_MOD_1 is not set")
-                                .to_lowercase();
-
-                            let is_mod: bool = author_name.to_lowercase() == mod_1.to_lowercase();
-
-                            if !is_mod
-                                && ((message.starts_with("/")
-                                    && !(message.starts_with("/e"))
-                                    && !(message.starts_with("/animspeed")))
-                                    || message.starts_with("["))
-                            {
-                                // Disable command usage for non-mods
-                                client
-                                    .reply_to_privmsg(
-                                        String::from("[You cannot run commands other than /e or /animspeed!]"),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-
-                            println!("{}: {}", author_name.to_lowercase(), message);
-
-                            let success = check_active(&bot_config.game_name);
-                            if !success {
-                                let _ = notify_admin("Failed to find Roblox!").await;
-                                client
-                                    .reply_to_privmsg(
-                                        String::from("[Failed to find Roblox! Notified dev.]"),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            if message.starts_with("/") {
-                                println!(
-                                    "Sending chat command from '{}'\n{}",
-                                    author_name, message
-                                );
-                                let chat_command_instructions = SystemInstruction {
-                                    client: Some(client.clone()),
-                                    chat_message: Some(msg.to_owned()),
-                                    instructions: vec![
-                                        InstructionPair {
-                                            execution_order: 0,
-                                            instruction: Instruction::CheckActive {
-                                                window_title: bot_config.game_name.to_owned(),
-                                            },
-                                        },
-                                        InstructionPair {
-                                            execution_order: 1,
-                                            instruction: Instruction::SystemChatMessage {
-                                                message: message,
-                                            },
-                                        },
-                                    ],
-                                };
-                                match queue_sender.send(chat_command_instructions) {
-                                    Err(_e) => eprintln!("Chat Command Channel Error"),
-                                    _ => (),
-                                }
-                            } else {
-                                println!("Sending chat message\n{}: {}", author_name, message);
-                                let chat_result_raw = get_chat(author_name, message).await;
-                                let mut chat_result: CensorClientReturn;
-                                match chat_result_raw {
-                                    Ok(valid_result) => match valid_result {
-                                        Some(result) => {
-                                            chat_result = result;
-                                        }
-                                        None => {
-                                            client.reply_to_privmsg(String::from("[Something went wrong, can't send a message. Contacting dev...]"), &msg).await.unwrap();
-                                            continue;
-                                        }
-                                    },
-                                    Err(_error) => {
-                                        let error_message: String = format!(
-                                            "[Censor Client Error - Main]\n```{:#?}```",
-                                            _error
-                                        );
-                                        eprint!("{}", &error_message);
-                                        let _ = notify_admin(&error_message).await;
-
-                                        client.reply_to_privmsg(String::from("[Something went wrong, can't send a message. Contacting dev...]"), &msg).await.unwrap();
-                                        continue;
-                                    }
-                                }
-                                for bot_message in &chat_result.bot_reply_message {
-                                    println!("Replying: '{}'", bot_message);
-                                    client
-                                        .reply_to_privmsg(bot_message.to_owned(), &msg)
-                                        .await
-                                        .unwrap();
-                                }
-
-                                if !chat_result.send_users_message {
-                                    continue;
-                                }
-                                let censored_username: String =
-                                    format!("{}:", chat_result.username);
-                                let censored_message: String = format!("{}", chat_result.message);
-                                println!("{}: {}", censored_username, censored_message);
-
-                                let chat_command_instructions = SystemInstruction {
-                                    client: Some(client.clone()),
-                                    chat_message: Some(msg.to_owned()),
-                                    instructions: vec![
-                                        InstructionPair {
-                                            execution_order: 0,
-                                            instruction: Instruction::CheckActive {
-                                                window_title: bot_config.game_name.to_owned(),
-                                            },
-                                        },
-                                        InstructionPair {
-                                            execution_order: 1,
-                                            instruction: Instruction::UserChatMessage {
-                                                message: censored_message,
-                                                author: censored_username,
-                                            },
-                                        },
-                                    ],
-                                };
-                                match queue_sender.send(chat_command_instructions) {
-                                    Err(_e) => eprintln!("User Chat Channel Error"),
-                                    _ => (),
-                                }
-                            }
+                        let success = check_active(&bot_config.game_name);
+                        if !success {
+                            notify_admin("Failed to find Roblox!").await.ok();
+                            client
+                                .reply_to_privmsg(
+                                    String::from("[Failed to find Roblox! Notified dev.]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
                         }
-                        "a" => {
-                            let mod_1 = env::var("TWITCH_MOD_1")
-                                .expect("$TWITCH_MOD_1 is not set")
-                                .to_lowercase();
-
-                            let author_name = msg.sender.name.to_string().to_lowercase();
-
-                            if author_name.to_lowercase() != mod_1.to_lowercase() {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from("[You do not have permissions to run this!]"),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-
-                            let mut msg_args = clean_args.to_owned();
-                            msg_args.drain(0..1);
-                            let message = msg_args.join(" ");
-                            if message.len() == 0 {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from("[Specify a message! (i.e. !a hello)]"),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-
-                            let capitalized_message = capitalize_string(&message);
-                            let formatted_message = format!("[{}]", capitalized_message);
-                            println!("Sending announce\n{}", formatted_message);
-                            let announce_instructions = SystemInstruction {
+                        if message.starts_with('/') {
+                            println!("Sending chat command from '{}'\n{}", author_name, message);
+                            let chat_command_instructions = SystemInstruction {
                                 client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
+                                chat_message: Some(msg.clone()),
                                 instructions: vec![
                                     InstructionPair {
                                         execution_order: 0,
                                         instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
+                                            window_title: bot_config.game_name.clone(),
+                                        },
+                                    },
+                                    InstructionPair {
+                                        execution_order: 1,
+                                        instruction: Instruction::SystemChatMessage { message },
+                                    },
+                                ],
+                            };
+                            if let Err(_e) = queue_sender.send(chat_command_instructions) {
+                                eprintln!("Chat Command Channel Error");
+                            }
+                        } else {
+                            println!("Sending chat message\n{}: {}", author_name, message);
+                            let chat_result_raw = get_chat(author_name, message).await;
+                            let chat_result: CensorClientReturn;
+                            match chat_result_raw {
+                                Ok(valid_result) => {
+                                    if let Some(result) = valid_result {
+                                        chat_result = result;
+                                    } else {
+                                        client.reply_to_privmsg(String::from("[Something went wrong, can't send a message. Contacting dev...]"), &msg).await.unwrap();
+                                        continue;
+                                    }
+                                }
+                                Err(error) => {
+                                    let error_message: String =
+                                        format!("[Censor Client Error - Main]\n```{:#?}```", error);
+                                    eprint!("{}", &error_message);
+                                    notify_admin(&error_message).await.ok();
+
+                                    client.reply_to_privmsg(String::from("[Something went wrong, can't send a message. Contacting dev...]"), &msg).await.unwrap();
+                                    continue;
+                                }
+                            }
+                            for bot_message in &chat_result.bot_reply_message {
+                                println!("Replying: '{}'", bot_message);
+                                client
+                                    .reply_to_privmsg(bot_message.clone(), &msg)
+                                    .await
+                                    .unwrap();
+                            }
+
+                            if !chat_result.send_users_message {
+                                continue;
+                            }
+                            let censored_username: String = format!("{}:", chat_result.username);
+                            let censored_message: String = chat_result.message.to_string();
+                            println!("{}: {}", censored_username, censored_message);
+
+                            let chat_command_instructions = SystemInstruction {
+                                client: Some(client.clone()),
+                                chat_message: Some(msg.clone()),
+                                instructions: vec![
+                                    InstructionPair {
+                                        execution_order: 0,
+                                        instruction: Instruction::CheckActive {
+                                            window_title: bot_config.game_name.clone(),
+                                        },
+                                    },
+                                    InstructionPair {
+                                        execution_order: 1,
+                                        instruction: Instruction::UserChatMessage {
+                                            message: censored_message,
+                                            author: censored_username,
+                                        },
+                                    },
+                                ],
+                            };
+                            if let Err(_e) = queue_sender.send(chat_command_instructions) {
+                                eprintln!("User Chat Channel Error");
+                            }
+                        }
+                    }
+                    "a" => {
+                        let mod_1 = env::var("TWITCH_MOD_1")
+                            .expect("$TWITCH_MOD_1 is not set")
+                            .to_lowercase();
+
+                        let author_name = msg.sender.name.to_string().to_lowercase();
+
+                        if author_name.to_lowercase() != mod_1.to_lowercase() {
+                            client
+                                .reply_to_privmsg(
+                                    String::from("[You do not have permissions to run this!]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+
+                        let mut msg_args = clean_args.clone();
+                        msg_args.drain(0..1);
+                        let message = msg_args.join(" ");
+                        if message.is_empty() {
+                            client
+                                .reply_to_privmsg(
+                                    String::from("[Specify a message! (i.e. !a hello)]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+
+                        let capitalized_message = capitalize_string(&message);
+                        let formatted_message = format!("[{}]", capitalized_message);
+                        println!("Sending announce\n{}", formatted_message);
+                        let announce_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::SystemChatMessage {
+                                        message: formatted_message,
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(announce_instructions) {
+                            eprintln!("Announce Command Channel Error");
+                        }
+                    }
+                    "dev" => {
+                        let message = format!(
+                            "{}: {}",
+                            &msg.sender.name,
+                            args.replacen("dev ", "", 1).replacen("dev", "", 1),
+                        );
+                        if message.is_empty() {
+                            client
+                                .reply_to_privmsg(String::from("[Specify a message, this command is for emergencies! (Please do not misuse it)]"), &msg)
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        let result = notify_admin(&message).await;
+                        if result.is_ok() {
+                            client
+                                .reply_to_privmsg(String::from("[Notified dev! As a reminder, this command is only for emergencies. If you were unaware of this and used the command by mistake, please write a message explaining that or you may be timed-out/banned.]"), &msg)
+                                .await
+                                .unwrap();
+                        } else {
+                            client
+                                .reply_to_privmsg(String::from("[Error! Was unable to notify dev. Please join the Discord and ping CamDev.]"), &msg)
+                                .await
+                                .unwrap();
+                        }
+                    }
+                    "move" => {
+                        if clean_args.len() < 2 {
+                            client
+                                .reply_to_privmsg(
+                                    String::from("[Specify a direction! (i.e. !move w 1)]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        let valid_directions = vec![
+                            String::from("w"),
+                            String::from("a"),
+                            String::from("s"),
+                            String::from("d"),
+                        ];
+                        let direction = clean_args[1].to_lowercase();
+                        if !valid_directions.contains(&direction) {
+                            client
+                                .reply_to_privmsg(
+                                    String::from("[Invalid direction! Specify a proper direction. (w, a, s, d)]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        const MAX_AMOUNT: f64 = 15.0;
+                        let mut amount: f64 = 1.0;
+                        if clean_args.len() > 2 {
+                            let num = clean_args[2].parse::<f64>();
+                            match num {
+                                Ok(val) => {
+                                    if val > MAX_AMOUNT || val <= 0.0 {
+                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[2], MAX_AMOUNT), &msg).await.unwrap();
+                                        continue;
+                                    }
+                                    amount = val;
+                                }
+                                Err(_why) => {
+                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[2]), &msg).await.unwrap();
+                                    continue;
+                                }
+                            }
+                        }
+
+                        let move_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::MoveDirection {
+                                        direction,
+                                        duration: amount,
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(move_instructions) {
+                            eprintln!("MoveDirection Channel Error");
+                        }
+                    }
+                    "warp" => {
+                        if clean_args.len() < 2 {
+                            client
+                                .reply_to_privmsg(
+                                    format!("[Specify a location! Map: https://sbf.fumocam.xyz/warp-map (Valid locations: {})]", bot_config.valid_tp_locations),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        let desired_location = bot_config.tp_locations.get(clean_args[1]);
+
+                        if let Some(desired_location) = desired_location {
+                            let warp_instructions = SystemInstruction {
+                                client: Some(client.clone()),
+                                chat_message: Some(msg.clone()),
+                                instructions: vec![
+                                    InstructionPair {
+                                        execution_order: 0,
+                                        instruction: Instruction::CheckActive {
+                                            window_title: bot_config.game_name.clone(),
                                         },
                                     },
                                     InstructionPair {
                                         execution_order: 1,
                                         instruction: Instruction::SystemChatMessage {
-                                            message: formatted_message,
-                                        },
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(announce_instructions) {
-                                Err(_e) => eprintln!("Announce Command Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "dev" => {
-                            let message = format!(
-                                "{}: {}",
-                                &msg.sender.name,
-                                args.replacen("dev ", "", 1).replacen("dev", "", 1),
-                            );
-                            if message.len() == 0 {
-                                client
-                                    .reply_to_privmsg(String::from("[Specify a message, this command is for emergencies! (Please do not misuse it)]"), &msg)
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            let result = notify_admin(&message).await;
-                            if result.is_ok() {
-                                client
-                                    .reply_to_privmsg(String::from("[Notified dev! As a reminder, this command is only for emergencies. If you were unaware of this and used the command by mistake, please write a message explaining that or you may be timed-out/banned.]"), &msg)
-                                    .await
-                                    .unwrap();
-                            } else {
-                                client
-                                    .reply_to_privmsg(String::from("[Error! Was unable to notify dev. Please join the Discord and ping CamDev.]"), &msg)
-                                    .await
-                                    .unwrap();
-                            }
-                        }
-                        "move" => {
-                            if clean_args.len() < 2 {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from("[Specify a direction! (i.e. !move w 1)]"),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            let valid_directions = vec![
-                                String::from("w"),
-                                String::from("a"),
-                                String::from("s"),
-                                String::from("d"),
-                            ];
-                            let direction = clean_args[1].to_lowercase();
-                            if !valid_directions.contains(&direction) {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from("[Invalid direction! Specify a proper direction. (w, a, s, d)]"),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            const MAX_AMOUNT: f64 = 15.0;
-                            let mut amount: f64 = 1.0;
-                            if clean_args.len() > 2 {
-                                let num = clean_args[2].parse::<f64>();
-                                match num {
-                                    Ok(val) => {
-                                        if val > MAX_AMOUNT || val <= 0.0 {
-                                            client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[2], MAX_AMOUNT), &msg).await.unwrap();
-                                            continue;
-                                        }
-                                        amount = val;
-                                    }
-                                    Err(_why) => {
-                                        client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[2]), &msg).await.unwrap();
-                                        continue;
-                                    }
-                                }
-                            }
-
-                            let move_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::MoveDirection {
-                                            direction: direction,
-                                            duration: amount,
-                                        },
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(move_instructions) {
-                                Err(_e) => eprintln!("MoveDirection Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "warp" => {
-                            if clean_args.len() < 2 {
-                                client
-                                    .reply_to_privmsg(
-                                        format!("[Specify a location! Map: https://sbf.fumocam.xyz/warp-map (Valid locations: {})]", bot_config.valid_tp_locations),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            let desired_location = bot_config.tp_locations.get(clean_args[1]);
-
-                            match desired_location {
-                                Some(desired_location) => {
-                                    let warp_instructions = SystemInstruction {
-                                        client: Some(client.clone()),
-                                        chat_message: Some(msg.to_owned()),
-                                        instructions: vec![
-                                            InstructionPair {
-                                                execution_order: 0,
-                                                instruction: Instruction::CheckActive {
-                                                    window_title: bot_config.game_name.to_owned(),
-                                                },
-                                            },
-                                            InstructionPair {
-                                                execution_order: 1,
-                                                instruction: Instruction::SystemChatMessage {
-                                                    message: format!(
-                                                        "[Warping to {}!]",
-                                                        desired_location
-                                                    )
-                                                    .to_string(),
-                                                },
-                                            },
-                                            InstructionPair {
-                                                execution_order: 1,
-                                                instruction: Instruction::Leap {
-                                                    // Clear any sitting effects
-                                                    forward_amount: 1.0,
-                                                    spacebar_amount: 1.0,
-                                                },
-                                            },
-                                            InstructionPair {
-                                                execution_order: 1,
-                                                instruction: Instruction::ConsoleCommand {
-                                                    command: format!("warp {}", desired_location)
-                                                        .to_string(),
-                                                },
-                                            },
-                                        ],
-                                    };
-                                    match queue_sender.send(warp_instructions) {
-                                        Err(_e) => eprintln!("Warp Channel Error"),
-                                        _ => (),
-                                    }
-                                }
-                                None => {
-                                    client.reply_to_privmsg(format!("[{} is not a valid location! Map: https://sbf.fumocam.xyz/warp-map (Valid locations: {})]", clean_args[1], bot_config.valid_tp_locations), &msg).await.unwrap();
-                                }
-                            }
-                        }
-                        "left" => {
-                            if clean_args.len() < 2 {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from(
-                                            "[Specify degrees to rotate! (i.e. !left 90)]",
-                                        ),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            const MAX_AMOUNT: f32 = 360.0;
-                            #[allow(unused_assignments)]
-                            let mut amount = 45.0;
-                            let num = clean_args[1].parse::<f32>();
-                            match num {
-                                Ok(val) => {
-                                    if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
-                                        continue;
-                                    }
-                                    amount = val;
-                                }
-                                Err(_why) => {
-                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 90.]", clean_args[1]), &msg).await.unwrap();
-                                    continue;
-                                }
-                            }
-                            let camera_left_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::MoveCameraX { x_ratio: amount },
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(camera_left_instructions) {
-                                Err(_e) => eprintln!("Camera Left Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "right" => {
-                            if clean_args.len() < 2 {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from(
-                                            "[Specify degrees to rotate! (i.e. !right 90)]",
-                                        ),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            const MAX_AMOUNT: f32 = 360.0;
-                            #[allow(unused_assignments)]
-                            let mut amount = 45.0;
-                            let num = clean_args[1].parse::<f32>();
-                            match num {
-                                Ok(val) => {
-                                    if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
-                                        continue;
-                                    }
-                                    amount = val;
-                                }
-                                Err(_why) => {
-                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 90.]", clean_args[1]), &msg).await.unwrap();
-                                    continue;
-                                }
-                            }
-                            let camera_right_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::MoveCameraX {
-                                            x_ratio: amount * -1.0,
-                                        },
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(camera_right_instructions) {
-                                Err(_e) => eprintln!("Camera Right Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "up" => {
-                            if clean_args.len() < 2 {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from("[Specify degrees to rotate! (i.e. !up 45)]"),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            const MAX_AMOUNT: f32 = 180.0;
-                            #[allow(unused_assignments)]
-                            let mut amount = 45.0;
-                            let num = clean_args[1].parse::<f32>();
-                            match num {
-                                Ok(val) => {
-                                    if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
-                                        continue;
-                                    }
-                                    amount = val;
-                                }
-                                Err(_why) => {
-                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 45.]", clean_args[1]), &msg).await.unwrap();
-                                    continue;
-                                }
-                            }
-                            let camera_up_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::MoveCameraY { y_ratio: amount },
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(camera_up_instructions) {
-                                Err(_e) => eprintln!("Camera Up Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "down" => {
-                            if clean_args.len() < 2 {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from(
-                                            "[Specify degrees to rotate! (i.e. !down 45)]",
-                                        ),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            const MAX_AMOUNT: f32 = 180.0;
-                            #[allow(unused_assignments)]
-                            let mut amount = 45.0;
-                            let num = clean_args[1].parse::<f32>();
-                            match num {
-                                Ok(val) => {
-                                    if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
-                                        continue;
-                                    }
-                                    amount = val;
-                                }
-                                Err(_why) => {
-                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 45.]", clean_args[1]), &msg).await.unwrap();
-                                    continue;
-                                }
-                            }
-                            let camera_down_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::MoveCameraY {
-                                            y_ratio: amount * -1.0,
-                                        },
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(camera_down_instructions) {
-                                Err(_e) => eprintln!("Camera Down Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "zoomin" => {
-                            if clean_args.len() < 2 {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from(
-                                            "[Specify percent to zoom in! (i.e. !zoomin 50)]",
-                                        ),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            const MAX_AMOUNT: f64 = 1000000.0;
-                            #[allow(unused_assignments)]
-                            let mut amount = 45.0;
-                            let num = clean_args[1].parse::<f64>();
-                            match num {
-                                Ok(val) => {
-                                    if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
-                                        continue;
-                                    }
-                                    amount = val;
-                                }
-                                Err(_why) => {
-                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 45.]", clean_args[1]), &msg).await.unwrap();
-                                    continue;
-                                }
-                            }
-                            let camera_zoom_in_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::ZoomCamera {
-                                            direction: "i".to_string(),
-                                            duration: amount,
-                                        },
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(camera_zoom_in_instructions) {
-                                Err(_e) => eprintln!("Camera Zoom In Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "zoomout" => {
-                            if clean_args.len() < 2 {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from(
-                                            "[Specify percent to zoom in! (i.e. !zoomin 50)]",
-                                        ),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            const MAX_AMOUNT: f64 = 1000000.0;
-                            #[allow(unused_assignments)]
-                            let mut amount = 45.0;
-                            let num = clean_args[1].parse::<f64>();
-                            match num {
-                                Ok(val) => {
-                                    if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
-                                        continue;
-                                    }
-                                    amount = val;
-                                }
-                                Err(_why) => {
-                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 50.]", clean_args[1]), &msg).await.unwrap();
-                                    continue;
-                                }
-                            }
-                            let camera_zoom_out_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::ZoomCamera {
-                                            direction: "o".to_string(),
-                                            duration: amount,
-                                        },
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(camera_zoom_out_instructions) {
-                                Err(_e) => eprintln!("Camera Zoom Out Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "leap" => {
-                            const MAX_AMOUNT: f64 = 2.0;
-                            let mut forward_amount: f64 = 1.0;
-                            let mut spacebar_amount: f64 = 1.0;
-                            if clean_args.len() > 1 {
-                                let num1 = clean_args[1].parse::<f64>();
-                                match num1 {
-                                    Ok(val) => {
-                                        if val > MAX_AMOUNT || val <= 0.0 {
-                                            client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
-                                            continue;
-                                        }
-                                        forward_amount = val;
-                                    }
-                                    Err(_why) => {
-                                        client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[1]), &msg).await.unwrap();
-                                        continue;
-                                    }
-                                }
-                            }
-                            if clean_args.len() > 2 {
-                                let num1 = clean_args[2].parse::<f64>();
-                                match num1 {
-                                    Ok(val) => {
-                                        if val > MAX_AMOUNT || val <= 0.0 {
-                                            client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[2], MAX_AMOUNT), &msg).await.unwrap();
-                                            continue;
-                                        }
-                                        spacebar_amount = val;
-                                    }
-                                    Err(_why) => {
-                                        client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[2]), &msg).await.unwrap();
-                                        continue;
-                                    }
-                                }
-                            }
-                            let leap_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
+                                            message: format!("[Warping to {}!]", desired_location)
+                                                .to_string(),
                                         },
                                     },
                                     InstructionPair {
                                         execution_order: 1,
                                         instruction: Instruction::Leap {
-                                            forward_amount: forward_amount,
-                                            spacebar_amount: spacebar_amount,
-                                        },
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(leap_instructions) {
-                                Err(_e) => eprintln!("Leap Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "hidemouse" => {
-                            let hide_mouse_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![InstructionPair {
-                                    execution_order: 0,
-                                    instruction: Instruction::HideMouse {},
-                                }],
-                            };
-                            match queue_sender.send(hide_mouse_instructions) {
-                                Err(_e) => eprintln!("Hide Mouse Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "jump" => {
-                            let jump_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::Leap {
-                                            forward_amount: 0.0,
+                                            // Clear any sitting effects
+                                            forward_amount: 1.0,
                                             spacebar_amount: 1.0,
                                         },
                                     },
-                                ],
-                            };
-                            match queue_sender.send(jump_instructions) {
-                                Err(_e) => eprintln!("Jump Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "grief" => {
-                            let jump_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::Grief {},
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(jump_instructions) {
-                                Err(_e) => eprintln!("Grief Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "refresh" => {
-                            let refresh_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
                                     InstructionPair {
                                         execution_order: 1,
                                         instruction: Instruction::ConsoleCommand {
-                                            command: "re".to_string(),
+                                            command: format!("warp {}", desired_location)
+                                                .to_string(),
                                         },
                                     },
                                 ],
                             };
-                            match queue_sender.send(refresh_instructions) {
-                                Err(_e) => eprintln!("Refresh Channel Error"),
-                                _ => (),
+                            if let Err(_e) = queue_sender.send(warp_instructions) {
+                                eprintln!("Warp Channel Error");
                             }
+                        } else {
+                            client.reply_to_privmsg(format!("[{} is not a valid location! Map: https://sbf.fumocam.xyz/warp-map (Valid locations: {})]", clean_args[1], bot_config.valid_tp_locations), &msg).await.unwrap();
                         }
-                        "die" => {
-                            let die_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::ConsoleCommand {
-                                            command: "die".to_string(),
-                                        },
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(die_instructions) {
-                                Err(_e) => eprintln!("Die Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "explode" => {
-                            let explode_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::ConsoleCommand {
-                                            command: "explode".to_string(),
-                                        },
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(explode_instructions) {
-                                Err(_e) => eprintln!("Explode Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "sit" => {
-                            let sit_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::Sit {},
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(sit_instructions) {
-                                Err(_e) => eprintln!("Sit Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "size" => {
-                            if clean_args.len() < 2 {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from("[Specify a size! The default is 'base'. (doll, shimmy, base, deka)]"),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            let valid_sizes = vec![
-                                String::from("base"),
-                                String::from("shimmy"),
-                                String::from("doll"),
-                                String::from("deka"),
-                            ];
-                            let size = clean_args[1].to_lowercase();
-                            if !valid_sizes.contains(&size) {
-                                client
-                                    .reply_to_privmsg(
-                                        String::from("[Invalid size! Specify a size, the default is 'base'. (doll, shimmy, base, deka)]"),
-                                        &msg,
-                                    )
-                                    .await
-                                    .unwrap();
-                                continue;
-                            }
-                            let size_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.to_owned()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.to_owned(),
-                                        },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::ConsoleCommand {
-                                            command: format!(
-                                                "changefumo SBFCam Momiji {}",
-                                                capitalize_string(&size) // console is case sensitive
-                                            ),
-                                        },
-                                    },
-                                ],
-                            };
-                            match queue_sender.send(size_instructions) {
-                                Err(_e) => eprintln!("Size Channel Error"),
-                                _ => (),
-                            }
-                        }
-                        "rejoin" => {
-                            let mod_1 = env::var("TWITCH_MOD_1")
-                                .expect("$TWITCH_MOD_1 is not set")
-                                .to_lowercase();
-
-                            let author_name = msg.sender.name.to_string().to_lowercase();
-                            let message: &str;
-                            if author_name.to_lowercase() == mod_1.to_lowercase() {
-                                let result =
-                                    force_rejoin(queue_sender.clone(), bot_config.clone()).await;
-                                if result {
-                                    message = "[Rejoin queued successfully!]";
-                                } else {
-                                    message = "[Failed to queue rejoin, Roblox API may be down!]";
-                                }
-                            } else {
-                                message = "[You do not have permissions to run this!]";
-                            }
-                            client
-                                .reply_to_privmsg(message.to_string(), &msg)
-                                .await
-                                .unwrap();
-                        }
-                        _ => {
+                    }
+                    "left" => {
+                        if clean_args.len() < 2 {
                             client
                                 .reply_to_privmsg(
-                                    String::from(
-                                        "[Not a valid command! Type !help for a list of commands.]",
-                                    ),
+                                    String::from("[Specify degrees to rotate! (i.e. !left 90)]"),
                                     &msg,
                                 )
                                 .await
                                 .unwrap();
+                            continue;
+                        }
+                        const MAX_AMOUNT: f32 = 360.0;
+                        #[allow(unused_assignments)]
+                        let mut amount = 45.0;
+                        let num = clean_args[1].parse::<f32>();
+                        match num {
+                            Ok(val) => {
+                                if val > MAX_AMOUNT || val <= 0.0 {
+                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                    continue;
+                                }
+                                amount = val;
+                            }
+                            Err(_why) => {
+                                client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 90.]", clean_args[1]), &msg).await.unwrap();
+                                continue;
+                            }
+                        }
+                        let camera_left_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::MoveCameraX { x_ratio: amount },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(camera_left_instructions) {
+                            eprintln!("Camera Left Channel Error");
                         }
                     }
-                }
+                    "right" => {
+                        if clean_args.len() < 2 {
+                            client
+                                .reply_to_privmsg(
+                                    String::from("[Specify degrees to rotate! (i.e. !right 90)]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        const MAX_AMOUNT: f32 = 360.0;
+                        #[allow(unused_assignments)]
+                        let mut amount = 45.0;
+                        let num = clean_args[1].parse::<f32>();
+                        match num {
+                            Ok(val) => {
+                                if val > MAX_AMOUNT || val <= 0.0 {
+                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                    continue;
+                                }
+                                amount = val;
+                            }
+                            Err(_why) => {
+                                client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 90.]", clean_args[1]), &msg).await.unwrap();
+                                continue;
+                            }
+                        }
+                        let camera_right_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::MoveCameraX {
+                                        x_ratio: amount * -1.0,
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(camera_right_instructions) {
+                            eprintln!("Camera Right Channel Error");
+                        }
+                    }
+                    "up" => {
+                        if clean_args.len() < 2 {
+                            client
+                                .reply_to_privmsg(
+                                    String::from("[Specify degrees to rotate! (i.e. !up 45)]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        const MAX_AMOUNT: f32 = 180.0;
+                        #[allow(unused_assignments)]
+                        let mut amount = 45.0;
+                        let num = clean_args[1].parse::<f32>();
+                        match num {
+                            Ok(val) => {
+                                if val > MAX_AMOUNT || val <= 0.0 {
+                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                    continue;
+                                }
+                                amount = val;
+                            }
+                            Err(_why) => {
+                                client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 45.]", clean_args[1]), &msg).await.unwrap();
+                                continue;
+                            }
+                        }
+                        let camera_up_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::MoveCameraY { y_ratio: amount },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(camera_up_instructions) {
+                            eprintln!("Camera Up Channel Error");
+                        }
+                    }
+                    "down" => {
+                        if clean_args.len() < 2 {
+                            client
+                                .reply_to_privmsg(
+                                    String::from("[Specify degrees to rotate! (i.e. !down 45)]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        const MAX_AMOUNT: f32 = 180.0;
+                        #[allow(unused_assignments)]
+                        let mut amount = 45.0;
+                        let num = clean_args[1].parse::<f32>();
+                        match num {
+                            Ok(val) => {
+                                if val > MAX_AMOUNT || val <= 0.0 {
+                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                    continue;
+                                }
+                                amount = val;
+                            }
+                            Err(_why) => {
+                                client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 45.]", clean_args[1]), &msg).await.unwrap();
+                                continue;
+                            }
+                        }
+                        let camera_down_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::MoveCameraY {
+                                        y_ratio: amount * -1.0,
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(camera_down_instructions) {
+                            eprintln!("Camera Down Channel Error");
+                        }
+                    }
+                    "zoomin" => {
+                        if clean_args.len() < 2 {
+                            client
+                                .reply_to_privmsg(
+                                    String::from("[Specify percent to zoom in! (i.e. !zoomin 50)]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        const MAX_AMOUNT: f64 = 1_000_000.0;
+                        #[allow(unused_assignments)]
+                        let mut amount = 45.0;
+                        let num = clean_args[1].parse::<f64>();
+                        match num {
+                            Ok(val) => {
+                                if val > MAX_AMOUNT || val <= 0.0 {
+                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                    continue;
+                                }
+                                amount = val;
+                            }
+                            Err(_why) => {
+                                client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 45.]", clean_args[1]), &msg).await.unwrap();
+                                continue;
+                            }
+                        }
+                        let camera_zoom_in_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::ZoomCamera {
+                                        direction: "i".to_string(),
+                                        duration: amount,
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(camera_zoom_in_instructions) {
+                            eprintln!("Camera Zoom In Channel Error");
+                        }
+                    }
+                    "zoomout" => {
+                        if clean_args.len() < 2 {
+                            client
+                                .reply_to_privmsg(
+                                    String::from("[Specify percent to zoom in! (i.e. !zoomin 50)]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        const MAX_AMOUNT: f64 = 1_000_000.0;
+                        #[allow(unused_assignments)]
+                        let mut amount = 45.0;
+                        let num = clean_args[1].parse::<f64>();
+                        match num {
+                            Ok(val) => {
+                                if val > MAX_AMOUNT || val <= 0.0 {
+                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                    continue;
+                                }
+                                amount = val;
+                            }
+                            Err(_why) => {
+                                client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 50.]", clean_args[1]), &msg).await.unwrap();
+                                continue;
+                            }
+                        }
+                        let camera_zoom_out_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::ZoomCamera {
+                                        direction: "o".to_string(),
+                                        duration: amount,
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(camera_zoom_out_instructions) {
+                            eprintln!("Camera Zoom Out Channel Error");
+                        }
+                    }
+                    "leap" => {
+                        const MAX_AMOUNT: f64 = 2.0;
+                        let mut forward_amount: f64 = 1.0;
+                        let mut spacebar_amount: f64 = 1.0;
+                        if clean_args.len() > 1 {
+                            let num1 = clean_args[1].parse::<f64>();
+                            match num1 {
+                                Ok(val) => {
+                                    if val > MAX_AMOUNT || val <= 0.0 {
+                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                        continue;
+                                    }
+                                    forward_amount = val;
+                                }
+                                Err(_why) => {
+                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[1]), &msg).await.unwrap();
+                                    continue;
+                                }
+                            }
+                        }
+                        if clean_args.len() > 2 {
+                            let num1 = clean_args[2].parse::<f64>();
+                            match num1 {
+                                Ok(val) => {
+                                    if val > MAX_AMOUNT || val <= 0.0 {
+                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[2], MAX_AMOUNT), &msg).await.unwrap();
+                                        continue;
+                                    }
+                                    spacebar_amount = val;
+                                }
+                                Err(_why) => {
+                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[2]), &msg).await.unwrap();
+                                    continue;
+                                }
+                            }
+                        }
+                        let leap_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::Leap {
+                                        forward_amount,
+                                        spacebar_amount,
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(leap_instructions) {
+                            eprintln!("Leap Channel Error");
+                        }
+                    }
+                    "hidemouse" => {
+                        let hide_mouse_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![InstructionPair {
+                                execution_order: 0,
+                                instruction: Instruction::HideMouse {},
+                            }],
+                        };
+                        if let Err(_e) = queue_sender.send(hide_mouse_instructions) {
+                            eprintln!("Hide Mouse Channel Error");
+                        }
+                    }
+                    "jump" => {
+                        let jump_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::Leap {
+                                        forward_amount: 0.0,
+                                        spacebar_amount: 1.0,
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(jump_instructions) {
+                            eprintln!("Jump Channel Error");
+                        }
+                    }
+                    "grief" => {
+                        let jump_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::Grief {},
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(jump_instructions) {
+                            eprintln!("Grief Channel Error");
+                        }
+                    }
+                    "refresh" => {
+                        let refresh_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::ConsoleCommand {
+                                        command: "re".to_string(),
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(refresh_instructions) {
+                            eprintln!("Refresh Channel Error");
+                        }
+                    }
+                    "die" => {
+                        let die_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::ConsoleCommand {
+                                        command: "die".to_string(),
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(die_instructions) {
+                            eprintln!("Die Channel Error");
+                        }
+                    }
+                    "explode" => {
+                        let explode_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::ConsoleCommand {
+                                        command: "explode".to_string(),
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(explode_instructions) {
+                            eprintln!("Explode Channel Error");
+                        }
+                    }
+                    "sit" => {
+                        let sit_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::Sit {},
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(sit_instructions) {
+                            eprintln!("Sit Channel Error");
+                        }
+                    }
+                    "size" => {
+                        if clean_args.len() < 2 {
+                            client
+                                .reply_to_privmsg(
+                                    String::from("[Specify a size! The default is 'base'. (doll, shimmy, base, deka)]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        let valid_sizes = vec![
+                            String::from("base"),
+                            String::from("shimmy"),
+                            String::from("doll"),
+                            String::from("deka"),
+                        ];
+                        let size = clean_args[1].to_lowercase();
+                        if !valid_sizes.contains(&size) {
+                            client
+                                .reply_to_privmsg(
+                                    String::from("[Invalid size! Specify a size, the default is 'base'. (doll, shimmy, base, deka)]"),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        let size_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::ConsoleCommand {
+                                        command: format!(
+                                            "changefumo SBFCam Momiji {}",
+                                            capitalize_string(&size) // console is case sensitive
+                                        ),
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(size_instructions) {
+                            eprintln!("Size Channel Error");
+                        }
+                    }
+                    "rejoin" => {
+                        let mod_1 = env::var("TWITCH_MOD_1")
+                            .expect("$TWITCH_MOD_1 is not set")
+                            .to_lowercase();
 
-                let _result = discord_log(&msg.message_text, &msg.sender.name, false).await;
+                        let author_name = msg.sender.name.to_string().to_lowercase();
+                        let message: &str;
+                        if author_name.to_lowercase() == mod_1.to_lowercase() {
+                            let result =
+                                force_rejoin(queue_sender.clone(), bot_config.clone()).await;
+                            if result {
+                                message = "[Rejoin queued successfully!]";
+                            } else {
+                                message = "[Failed to queue rejoin, Roblox API may be down!]";
+                            }
+                        } else {
+                            message = "[You do not have permissions to run this!]";
+                        }
+                        client
+                            .reply_to_privmsg(message.to_string(), &msg)
+                            .await
+                            .unwrap();
+                    }
+                    _ => {
+                        client
+                            .reply_to_privmsg(
+                                String::from(
+                                    "[Not a valid command! Type !help for a list of commands.]",
+                                ),
+                                &msg,
+                            )
+                            .await
+                            .unwrap();
+                    }
+                }
             }
-            _ => {}
+
+            let _result = discord_log(&msg.message_text, &msg.sender.name, false).await;
         }
     }
 }
@@ -1747,10 +1694,11 @@ pub struct BotConfig {
     valid_tp_locations: String,
 }
 
+#[must_use]
 pub fn init_config() -> BotConfig {
     let game_name: String = "Roblox".to_string();
     let game_executable: String = "RobloxPlayerBeta.exe".to_string();
-    let game_id: i64 = 7363647365;
+    let game_id: i64 = 7_363_647_365;
     let twitch_channel_name: String = "sbfcam".to_string();
     let twitch_bot_username: String = "sbfcamBOT".to_string();
 
@@ -1760,18 +1708,17 @@ pub fn init_config() -> BotConfig {
     let twitch_bot_token = env::var("TWITCH_BOT_TOKEN").expect("$TWITCH_BOT_TOKEN is not set");
     let player_token = env::var("PLAYER_TOKEN").expect("$PLAYER_TOKEN is not set");
 
-    let bot_config = BotConfig {
+    BotConfig {
         game_name,
         game_executable,
         game_id,
-        tp_locations: tp_locations,
+        tp_locations,
         twitch_bot_username,
-        twitch_bot_token: twitch_bot_token,
-        player_token: player_token,
+        twitch_bot_token,
+        player_token,
         twitch_channel_name,
-        valid_tp_locations: valid_tp_locations,
-    };
-    return bot_config;
+        valid_tp_locations,
+    }
 }
 
 pub async fn anti_afk_loop(
@@ -1792,7 +1739,7 @@ pub async fn anti_afk_loop(
                     InstructionPair {
                         execution_order: 0,
                         instruction: Instruction::CheckActive {
-                            window_title: bot_config.game_name.to_owned(),
+                            window_title: bot_config.game_name.clone(),
                         },
                     },
                     InstructionPair {
@@ -1817,9 +1764,8 @@ pub async fn anti_afk_loop(
                     },
                 ],
             };
-            match queue_sender.send(anti_afk_instructions) {
-                Err(_e) => eprintln!("Anti-AFK Channel Error"),
-                _ => (),
+            if let Err(_e) = queue_sender.send(anti_afk_instructions) {
+                eprintln!("Anti-AFK Channel Error");
             }
         }
 
@@ -1830,7 +1776,7 @@ pub async fn anti_afk_loop(
                 InstructionPair {
                     execution_order: 0,
                     instruction: Instruction::CheckActive {
-                        window_title: bot_config.game_name.to_owned(),
+                        window_title: bot_config.game_name.clone(),
                     },
                 },
                 InstructionPair {
@@ -1839,9 +1785,8 @@ pub async fn anti_afk_loop(
                 },
             ],
         };
-        match queue_sender.send(advert_instructions) {
-            Err(_e) => eprintln!("Anti-AFK Channel Error"),
-            _ => (),
+        if let Err(_e) = queue_sender.send(advert_instructions) {
+            eprintln!("Anti-AFK Channel Error");
         }
     }
 }
@@ -1898,36 +1843,33 @@ pub async fn get_instances(game_id: i64) -> Result<Option<Vec<GameInstance>>, Bo
         }
         let instance = GameInstance {
             id: place.get("id").unwrap().as_str().unwrap().to_string(),
-            players: players,
+            players,
         };
-        instance_list.push(instance)
+        instance_list.push(instance);
     }
 
     Ok(Some(instance_list))
 }
 
-async fn get_current_server(
-    player_token: String,
-    instance_list: Vec<GameInstance>,
-) -> GameInstance {
+fn get_current_server(player_token: &String, instance_list: Vec<GameInstance>) -> GameInstance {
     for instance in instance_list {
         println!("{}", instance.id);
-        if instance.players.contains(&player_token) {
+        if instance.players.contains(player_token) {
             return instance;
         }
     }
-    return GameInstance {
+    GameInstance {
         id: UNKNOWN_SERVER_ID.to_string(),
         players: vec![],
-    };
+    }
 }
 
-async fn check_in_server(player_token: String, instance_list: Vec<GameInstance>) -> bool {
-    let current_server = get_current_server(player_token, instance_list).await;
-    return current_server.id != UNKNOWN_SERVER_ID.to_string();
+fn check_in_server(player_token: &String, instance_list: Vec<GameInstance>) -> bool {
+    let current_server = get_current_server(player_token, instance_list);
+    current_server.id != *UNKNOWN_SERVER_ID
 }
 
-async fn get_best_server(instance_list: Vec<GameInstance>) -> GameInstance {
+fn get_best_server(instance_list: Vec<GameInstance>) -> GameInstance {
     let mut best_server = GameInstance {
         id: UNKNOWN_SERVER_ID.to_string(),
         players: vec![],
@@ -1937,15 +1879,15 @@ async fn get_best_server(instance_list: Vec<GameInstance>) -> GameInstance {
             best_server = instance;
         }
     }
-    return best_server;
+    best_server
 }
 
-async fn check_in_best_server(player_token: String, instance_list: Vec<GameInstance>) -> bool {
+fn check_in_best_server(player_token: &String, instance_list: Vec<GameInstance>) -> bool {
     const LOW_SWITCH: usize = 2;
     const LOW_SWITCH_THRESH: usize = 7;
     const HIGH_SWITCH: usize = 5;
-    let best_server = get_best_server(instance_list.clone()).await;
-    if best_server.id == UNKNOWN_SERVER_ID.to_string() {
+    let best_server = get_best_server(instance_list.clone());
+    if best_server.id == *UNKNOWN_SERVER_ID {
         // Somehow, our instance list is empty. Stay in current server for safety.
         return true;
     }
@@ -1956,12 +1898,12 @@ async fn check_in_best_server(player_token: String, instance_list: Vec<GameInsta
     };
     for instance in instance_list {
         println!("{}", instance.id);
-        if instance.players.contains(&player_token) {
-            current_server = instance.clone();
+        if instance.players.contains(player_token) {
+            current_server = instance;
             break;
         }
     }
-    if best_server.id == UNKNOWN_SERVER_ID.to_string() {
+    if best_server.id == *UNKNOWN_SERVER_ID {
         // Somehow, our instance list is empty. Stay in current server for safety.
         return true;
     }
@@ -1978,20 +1920,19 @@ async fn check_in_best_server(player_token: String, instance_list: Vec<GameInsta
     let difference = best_server.players.len() - current_server.players.len();
     println!("[Server difference {}]", difference);
     println!("[Required switch difference {}]", required_difference);
-    return difference <= required_difference;
+    difference <= required_difference
 }
 
-async fn _force_rejoin(
-    queue_sender: UnboundedSender<SystemInstruction>,
-    bot_config: BotConfig,
+fn _force_rejoin(
+    queue_sender: &UnboundedSender<SystemInstruction>,
+    bot_config: &BotConfig,
     instance_list: Vec<GameInstance>,
 ) {
-    let best_server = get_best_server(instance_list.clone()).await;
-    let current_server =
-        get_current_server(bot_config.player_token.to_owned(), instance_list.clone()).await;
+    let best_server = get_best_server(instance_list.clone());
+    let current_server = get_current_server(&bot_config.player_token, instance_list);
 
     let mut instructions: Vec<InstructionPair> = vec![];
-    if current_server.id != UNKNOWN_SERVER_ID && check_active(&bot_config.game_name.to_owned()) {
+    if current_server.id != UNKNOWN_SERVER_ID && check_active(&bot_config.game_name) {
         instructions.push(InstructionPair {
             execution_order: 0,
             instruction: Instruction::SystemChatMessage {
@@ -2017,13 +1958,13 @@ async fn _force_rejoin(
     instructions.push(InstructionPair {
         execution_order: 4,
         instruction: Instruction::JoinServer {
-            server_id: best_server.id.to_owned(),
+            server_id: best_server.id,
         },
     });
     instructions.push(InstructionPair {
         execution_order: 5,
         instruction: Instruction::CheckActive {
-            window_title: bot_config.game_name.to_owned(),
+            window_title: bot_config.game_name.clone(),
         },
     });
     instructions.push(InstructionPair {
@@ -2036,11 +1977,10 @@ async fn _force_rejoin(
     let join_instruction = SystemInstruction {
         client: None,
         chat_message: None,
-        instructions: instructions,
+        instructions,
     };
-    match queue_sender.send(join_instruction) {
-        Err(_e) => eprintln!("JoinServer Channel Error"),
-        _ => (),
+    if let Err(_e) = queue_sender.send(join_instruction) {
+        eprintln!("JoinServer Channel Error");
     }
 }
 
@@ -2050,30 +1990,24 @@ async fn force_rejoin(
 ) -> bool {
     let get_instances_result = get_instances(bot_config.game_id).await;
     match get_instances_result {
-        Ok(instance_list_option) => match instance_list_option {
-            Some(instance_list) => {
-                let best_server = get_best_server(instance_list.clone()).await;
-                if best_server.id == UNKNOWN_SERVER_ID.to_string() {
+        Ok(instance_list_option) => {
+            if let Some(instance_list) = instance_list_option {
+                let best_server = get_best_server(instance_list.clone());
+                if best_server.id == *UNKNOWN_SERVER_ID {
                     eprintln!("[Roblox API check failed]");
-                    return false;
+                    false
                 } else {
-                    _force_rejoin(
-                        queue_sender.clone(),
-                        bot_config.clone(),
-                        instance_list.clone(),
-                    )
-                    .await;
-                    return true;
+                    _force_rejoin(&queue_sender, &bot_config, instance_list);
+                    true
                 }
-            }
-            None => {
+            } else {
                 eprintln!("[Roblox API check failed]");
-                return false;
+                false
             }
-        },
+        }
         Err(_error) => {
             eprintln!("[Roblox API check failed]");
-            return false;
+            false
         }
     }
 }
@@ -2083,10 +2017,9 @@ async fn server_check_logic(
     bot_config: BotConfig,
     instance_list: Vec<GameInstance>,
 ) {
-    let in_server =
-        check_in_server(bot_config.player_token.to_owned(), instance_list.clone()).await;
+    let in_server = check_in_server(&bot_config.player_token, instance_list.clone());
     let in_best_server = if in_server {
-        check_in_best_server(bot_config.player_token.to_owned(), instance_list.clone()).await
+        check_in_best_server(&bot_config.player_token, instance_list.clone())
     } else {
         false
     };
@@ -2095,16 +2028,15 @@ async fn server_check_logic(
         return;
     }
 
-    let best_server = get_best_server(instance_list.clone()).await;
-    let current_server =
-        get_current_server(bot_config.player_token.to_owned(), instance_list.clone()).await;
+    let best_server = get_best_server(instance_list.clone());
+    let current_server = get_current_server(&bot_config.player_token, instance_list.clone());
     let difference = best_server.players.len() - current_server.players.len();
 
     let mut instructions = vec![
         InstructionPair {
             execution_order: 0,
             instruction: Instruction::CheckActive {
-                window_title: bot_config.game_name.to_owned(),
+                window_title: bot_config.game_name.clone(),
             },
         },
         InstructionPair {
@@ -2134,13 +2066,13 @@ async fn server_check_logic(
         InstructionPair {
             execution_order: 5,
             instruction: Instruction::JoinServer {
-                server_id: best_server.id.to_owned(),
+                server_id: best_server.id.clone(),
             },
         },
         InstructionPair {
             execution_order: 6,
             instruction: Instruction::CheckActive {
-                window_title: bot_config.game_name.to_owned(),
+                window_title: bot_config.game_name.clone(),
             },
         },
         InstructionPair {
@@ -2154,10 +2086,10 @@ async fn server_check_logic(
         // Crash likely
         println!("Potential crash detected");
 
-        let is_active = check_active(&bot_config.game_name.to_owned());
+        let is_active = check_active(&bot_config.game_name.clone());
         let exe_status = if is_active { "Running" } else { "Not found" };
         let message = format!("Likely crash detected | {}", exe_status);
-        _ = notify_admin(&message).await;
+        notify_admin(&message).await.ok();
 
         instructions = vec![
             InstructionPair {
@@ -2174,13 +2106,13 @@ async fn server_check_logic(
             InstructionPair {
                 execution_order: 2,
                 instruction: Instruction::JoinServer {
-                    server_id: best_server.id.to_owned(),
+                    server_id: best_server.id.clone(),
                 },
             },
             InstructionPair {
                 execution_order: 3,
                 instruction: Instruction::CheckActive {
-                    window_title: bot_config.game_name.to_owned(),
+                    window_title: bot_config.game_name.clone(),
                 },
             },
             InstructionPair {
@@ -2195,11 +2127,10 @@ async fn server_check_logic(
     let join_instruction = SystemInstruction {
         client: None,
         chat_message: None,
-        instructions: instructions,
+        instructions,
     };
-    match queue_sender.send(join_instruction) {
-        Err(_e) => eprintln!("JoinServer Channel Error"),
-        _ => (),
+    if let Err(_e) = queue_sender.send(join_instruction) {
+        eprintln!("JoinServer Channel Error");
     }
 }
 
@@ -2215,9 +2146,9 @@ async fn server_check_loop(
         match get_instances_result {
             Ok(instance_list_option) => match instance_list_option {
                 Some(instance_list) => {
-                    let best_server = get_best_server(instance_list.clone()).await;
-                    if best_server.id == UNKNOWN_SERVER_ID.to_string() {
-                        eprint!("[Roblox API check failed]")
+                    let best_server = get_best_server(instance_list.clone());
+                    if best_server.id == *UNKNOWN_SERVER_ID {
+                        eprint!("[Roblox API check failed]");
                     } else {
                         server_check_logic(
                             queue_sender.clone(),
@@ -2238,10 +2169,7 @@ async fn server_check_loop(
     }
 }
 
-fn join_game_selenium(
-    game_id: i64,
-    instance_id: &str,
-) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+fn join_game_selenium(game_id: i64, instance_id: &str) {
     println!("Selenium subprocess started");
     let driver = match env::var("CHROME_DRIVER_FILE_NAME") {
         Ok(val) => val,
@@ -2257,7 +2185,7 @@ fn join_game_selenium(
             "--game",
             &game_id.to_string(),
             "--instance",
-            &instance_id,
+            instance_id,
             "--driver",
             &driver,
         ])
@@ -2267,11 +2195,10 @@ fn join_game_selenium(
     println!("Selenium subprocess finished");
     println!("{}", String::from_utf8_lossy(&output.stdout));
     eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-
-    Ok(())
 }
 
-pub async fn restart_warn(restart_warn_ticker: i32) -> i32 {
+#[must_use]
+pub fn restart_warn(restart_warn_ticker: i32) -> i32 {
     let now = chrono::offset::Local::now();
     if now.hour() != 3 {
         return -1;
@@ -2287,25 +2214,25 @@ pub async fn restart_warn(restart_warn_ticker: i32) -> i32 {
 
     // Don't do anything if our uptime is less than two minutes
     unsafe {
-        const TWO_MINUTES: u64 = 120000; // 1000 * 60 * 2, Could be one minute, but safety padding is nice
+        const TWO_MINUTES: u64 = 120_000; // 1000 * 60 * 2, Could be one minute, but safety padding is nice
         if winapi::um::sysinfoapi::GetTickCount64() < TWO_MINUTES {
             return -1;
         }
     }
 
     if minute == FIVE_MINUTE_WARNING {
-        return FIVE_MINUTE_WARNING;
+        FIVE_MINUTE_WARNING
     } else if minute == ONE_MINUTE_WARNING {
-        return ONE_MINUTE_WARNING;
+        ONE_MINUTE_WARNING
     } else if minute == REBOOT_TIME {
-        return REBOOT_TIME;
+        REBOOT_TIME
     } else {
-        return -1;
-    };
+        -1
+    }
 }
 
-pub async fn restart_logic(
-    queue_sender: UnboundedSender<SystemInstruction>,
+pub fn restart_logic(
+    queue_sender: &UnboundedSender<SystemInstruction>,
     bot_config: BotConfig,
     restart_return: i32,
 ) {
@@ -2319,7 +2246,7 @@ pub async fn restart_logic(
         InstructionPair {
             execution_order: 0,
             instruction: Instruction::CheckActive {
-                window_title: bot_config.game_name.to_owned(),
+                window_title: bot_config.game_name,
             },
         },
         InstructionPair {
@@ -2343,11 +2270,10 @@ pub async fn restart_logic(
     let restart_system_instruction = SystemInstruction {
         client: None,
         chat_message: None,
-        instructions: instructions,
+        instructions,
     };
-    match queue_sender.send(restart_system_instruction) {
-        Err(_e) => eprintln!("Restart chat command error"),
-        _ => (),
+    if let Err(_e) = queue_sender.send(restart_system_instruction) {
+        eprintln!("Restart chat command error");
     }
 }
 
@@ -2457,12 +2383,12 @@ pub async fn get_hardware_data() -> Result<Option<String>, Box<dyn Error>> {
                 }
             );
             let response_json_str = serde_json::to_string(&response_json).unwrap();
-            return Ok(Some(response_json_str));
+            Ok(Some(response_json_str))
         }
         Err(e) => {
             println!("{}", body);
             eprintln!("Error! {:#?}", e);
-            return Ok(Option::None);
+            Ok(Option::None)
         }
     }
 }
@@ -2481,40 +2407,38 @@ pub async fn clock_tick_loop(
         interval.tick().await;
 
         // Restart logic
-        let restart_return = restart_warn(restart_warn_ticker).await;
+        let restart_return = restart_warn(restart_warn_ticker);
         if restart_warn_ticker != restart_return && restart_return != -1 {
             restart_warn_ticker = restart_return;
-            restart_logic(queue_sender.clone(), bot_config.clone(), restart_return).await;
+            restart_logic(&queue_sender, bot_config.clone(), restart_return);
         }
 
         // Hardware stats logic
         if hw_stat_loop < HW_STAT_LOOP_MAX {
             // Only check for/send updates every HW_STAT_LOOP_MAX seconds
-            hw_stat_loop = hw_stat_loop + 1;
+            hw_stat_loop += 1;
             continue;
-        } else {
-            hw_stat_loop = 0;
         }
+        hw_stat_loop = 0;
         let hw_stat_result = get_hardware_data().await;
         let hw_stat_data: String;
         match hw_stat_result {
-            Ok(valid_result) => match valid_result {
-                Some(result) => {
+            Ok(valid_result) => {
+                if let Some(result) = valid_result {
                     hw_stat_data = result;
-                }
-                None => {
+                } else {
                     eprintln!("[Open Hardware Monitor query failed]");
-                    hw_stat_data = hw_stat_error_val.to_owned();
+                    hw_stat_data = hw_stat_error_val.clone();
                 }
-            },
-            Err(_error) => {
-                eprintln!("[Open Hardware Monitor query error]\n{}", _error);
-                hw_stat_data = hw_stat_error_val.to_owned();
+            }
+            Err(error) => {
+                eprintln!("[Open Hardware Monitor query error]\n{}", error);
+                hw_stat_data = hw_stat_error_val.clone();
             }
         }
-        match hud_sender.send(HUDInstruction::SystemMonitorUpdate { data: hw_stat_data }) {
-            Err(_e) => eprintln!("[HUD] System Monitor Update Channel Error"),
-            _ => (),
+        if let Err(_e) = hud_sender.send(HUDInstruction::SystemMonitorUpdate { data: hw_stat_data })
+        {
+            eprintln!("[HUD] System Monitor Update Channel Error");
         }
     }
 }
@@ -2559,11 +2483,11 @@ fn get_pixel(
     match serde_json::from_str::<bool>(&String::from_utf8_lossy(&output.stdout)) {
         Ok(return_val) => {
             println!("Pixel Response: {}", return_val);
-            return return_val;
+            return_val
         }
         Err(e) => {
             eprintln!("Error! {:#?}", e);
-            return false;
+            false
         }
     }
 }
@@ -2576,7 +2500,7 @@ fn cv_get_backpack_hover(window_title: &str) -> bool {
     thread::sleep(DELAY);
     mouse_move(&mut enigo, 0.47, 0.95);
     println!("cv_get_backpack_hover");
-    return get_pixel(691, 669, 9, 5, 179, 179, 179);
+    get_pixel(691, 669, 9, 5, 179, 179, 179)
 }
 fn cv_get_navbar(window_title: &str) -> bool {
     check_active(window_title);
@@ -2586,17 +2510,17 @@ fn cv_get_navbar(window_title: &str) -> bool {
     thread::sleep(DELAY);
     mouse_move(&mut enigo, 0.47, 0.99);
     println!("cv_get_navbar");
-    return get_pixel(691, 669, 9, 5, 255, 255, 255);
+    get_pixel(691, 669, 9, 5, 255, 255, 255)
 }
 fn cv_get_navbar_hidden(window_title: &str) -> bool {
-    check_active(&window_title);
+    check_active(window_title);
     const DELAY: Duration = Duration::from_millis(500);
     let mut enigo = Enigo::new();
     mouse_hide(&mut enigo);
     thread::sleep(DELAY);
     mouse_hide(&mut enigo);
     println!("cv_get_navbar_hidden");
-    return !(get_pixel(691, 669, 9, 5, 255, 255, 255));
+    !(get_pixel(691, 669, 9, 5, 255, 255, 255))
 }
 
 fn cv_check_loaded_in(window_title: &str) -> bool {
@@ -2653,7 +2577,7 @@ fn cv_check_loaded_in(window_title: &str) -> bool {
         return false;
     }
 
-    return true;
+    true
 }
 
 // START HUD STUFF
@@ -2710,8 +2634,8 @@ pub async fn hud_loop(mut hud_receiver: UnboundedReceiver<HUDInstruction>) {
                     clients.len(),
                     message
                 );
-                for (_client_id, client_responder) in &clients {
-                    client_responder.send(simple_websockets::Message::Text(message.to_owned()));
+                for client_responder in clients.values() {
+                    client_responder.send(simple_websockets::Message::Text(message.clone()));
                 }
             }
             HUDInstruction::TimedMessage { message, time } => {
@@ -2727,7 +2651,7 @@ pub async fn hud_loop(mut hud_receiver: UnboundedReceiver<HUDInstruction>) {
                         "message": message
                     }
                 });
-                for (_client_id, client_responder) in &clients {
+                for client_responder in clients.values() {
                     client_responder
                         .send(simple_websockets::Message::Text(message_obj.to_string()));
                 }
@@ -2744,7 +2668,7 @@ pub async fn hud_loop(mut hud_receiver: UnboundedReceiver<HUDInstruction>) {
                         "data": data
                     }
                 });
-                for (_client_id, client_responder) in &clients {
+                for client_responder in clients.values() {
                     client_responder
                         .send(simple_websockets::Message::Text(message_obj.to_string()));
                 }
@@ -2758,21 +2682,17 @@ pub async fn hud_ws_server(hud_sender: UnboundedSender<HUDInstruction>) {
         match event_hub.poll_async().await {
             simple_websockets::Event::Connect(client_id, responder) => {
                 println!("[HUD] A client connected with id #{}", client_id);
-                match hud_sender.send(HUDInstruction::AddClient {
-                    client_id: client_id,
-                    responder: responder,
+                if let Err(_e) = hud_sender.send(HUDInstruction::AddClient {
+                    client_id,
+                    responder,
                 }) {
-                    Err(_e) => eprintln!("[HUD] Client Connect Channel Error"),
-                    _ => (),
+                    eprintln!("[HUD] Client Connect Channel Error");
                 }
             }
             simple_websockets::Event::Disconnect(client_id) => {
                 println!("[HUD] A client connected with id #{}", client_id);
-                match hud_sender.send(HUDInstruction::RemoveClient {
-                    client_id: client_id,
-                }) {
-                    Err(_e) => eprintln!("[HUD] Client Disconnect Channel Error"),
-                    _ => (),
+                if let Err(_e) = hud_sender.send(HUDInstruction::RemoveClient { client_id }) {
+                    eprintln!("[HUD] Client Disconnect Channel Error");
                 }
             }
             simple_websockets::Event::Message(client_id, message) => {
@@ -2790,9 +2710,8 @@ pub async fn hud_ws_server(hud_sender: UnboundedSender<HUDInstruction>) {
                         }
                     }
                 };
-                match hud_sender.send(hud_message_instruction) {
-                    Err(_e) => eprintln!("[HUD] Client Message Channel Error"),
-                    _ => (),
+                if let Err(_e) = hud_sender.send(hud_message_instruction) {
+                    eprintln!("[HUD] Client Message Channel Error");
                 }
             }
         }
@@ -2828,7 +2747,7 @@ pub async fn main() {
     let hud_loop_task = hud_loop(hud_receiver);
     let hud_ws_server_task = hud_ws_server(hud_sender.clone());
 
-    check_active(&bot_config.game_name.to_owned());
+    check_active(&bot_config.game_name.clone());
 
     let (_r1, _r2, _r3, _r4, _r5, _r6, _r7) = tokio::join!(
         twitch_task,
@@ -2869,7 +2788,7 @@ pub async fn main() {
 //     let hud_loop_task = hud_loop(hud_receiver);
 //     let hud_ws_server_task = hud_ws_server(hud_sender.clone());
 
-//     // check_active(&bot_config.game_name.to_owned());
+//     // check_active(&bot_config.game_name.clone());
 
 //     let (
 //         _r1,
