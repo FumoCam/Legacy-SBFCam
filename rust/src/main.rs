@@ -619,6 +619,7 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
     tp_locations.insert(String::from("sky"), String::from("Floating Island"));
     tp_locations.insert(String::from("fire"), String::from("Fireside Island"));
     tp_locations.insert(String::from("beach"), String::from("Beach"));
+    tp_locations.insert(String::from("beachhouse"), String::from("Beach House"));
     tp_locations.insert(String::from("devil"), String::from("Scarlet Devil Mansion"));
     tp_locations.insert(String::from("highway"), String::from("Highway"));
     tp_locations.insert(String::from("sewers"), String::from("Rat Sewers"));
@@ -1781,7 +1782,16 @@ pub async fn anti_afk_loop(
                 },
                 InstructionPair {
                     execution_order: 1,
-                    instruction: Instruction::SystemChatMessage { message: "You can control this bot live on T witch! Go to t witch.tv and search my username (without the underscore/number)".to_string()},
+                    instruction: Instruction::SystemChatMessage {
+                        message: "You can control this bot live!".to_string(),
+                    },
+                },
+                InstructionPair {
+                    execution_order: 2,
+                    instruction: Instruction::SystemChatMessage {
+                        message: "Go to its Roblox profile and click the purple T witch icon!"
+                            .to_string(),
+                    },
                 },
             ],
         };
