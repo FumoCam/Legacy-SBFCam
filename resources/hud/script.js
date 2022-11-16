@@ -343,13 +343,9 @@ function update_loop(animation_speed_ms) {
 
 function changelog() {
   // START CHANGE-ME
-  const VERSION = 17;
-  const UPDATE_DATE = "2022-10-14";
-  const UPDATE_ITEMS = [
-    "Implemented Chat Censor Service",
-    "USE !dev IF SOMETHING BROKE WITH CHAT",
-    "If you cant do/say something you could before, use !dev",
-  ];
+  const VERSION = 18;
+  const UPDATE_DATE = "2022-11-15";
+  const UPDATE_ITEMS = ["Added !hat and !removehat commands."];
   // END CHANGE-ME
   animateNumericalValue(
     document.getElementById("version-value"),

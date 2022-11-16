@@ -207,8 +207,9 @@ fn send_user_chat(author: &str, msg: &str) {
 fn run_console_command(command: &str) {
     let mut enigo = Enigo::new();
     enigo.key_click(Key::Layout('\\'));
-    thread::sleep(Duration::from_millis(400));
+    thread::sleep(Duration::from_millis(750));
     enigo.key_sequence(command);
+    thread::sleep(Duration::from_millis(750));
     enigo.key_click(Key::Return);
 }
 
@@ -633,6 +634,48 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
         .join(", ");
 
     (tp_locations, valid_tp_locations)
+}
+
+#[must_use]
+pub fn get_hat_types() -> (HashMap<String, String>, String) {
+    // TODO: Make this less awful
+    let hat_types = HashMap::from_iter(
+        [
+            ("none", "none"),
+            ("bird", "bird"),
+            ("doremy", "DoremyHatOMGG"),
+            ("fire1", "Diable Jambe V1"),
+            ("fire2", "Diable Jambe V2"),
+            ("glasses1", "Keine"),
+            ("glasses2", "gagglasses"),
+            ("glasses3", "KaminaGlasses"),
+            ("hanyuu", "hanyuuhat"),
+            ("koishi", "KOISHIIIIIIII"),
+            ("marisa1", "MarisaHat"),
+            ("marisa2", "Marisav2Hat"),
+            ("marisa3", "MarisasoewHat"),
+            ("marisa4", "Marisapc98casualHat"),
+            ("marisa5", "redmarisahat"),
+            ("marisa6", "MarisaufoHat"),
+            ("marisa6", "Marisapc98Hat"),
+            ("meiling", "meilinghat"),
+            ("miko", "MikoCape"),
+            ("niko", "NikoHat"),
+            ("pancake", "pancak"),
+            ("scythe", "ellyscythe"),
+            ("strawberry", "Strawberry"),
+            ("youmu", "youmumyonandswords"),
+        ]
+        .map(|(a, b)| (String::from(a), String::from(b))),
+    );
+
+    let valid_hats = hat_types
+        .keys()
+        .map(|s| &**s)
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    (hat_types, valid_hats)
 }
 
 #[allow(non_snake_case)]
@@ -1640,6 +1683,82 @@ pub async fn twitch_loop(
                             eprintln!("Size Channel Error");
                         }
                     }
+                    "hat" => {
+                        if clean_args.len() < 2 {
+                            client
+                                .reply_to_privmsg(
+                                    format!(
+                                        "[Specify a hat, or use !removehat. (Valid hats: {})]",
+                                        bot_config.valid_hat_types
+                                    ),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                            continue;
+                        }
+                        let requested_hat_type = clean_args[1].to_lowercase();
+                        let desired_hat = bot_config.hat_types.get(&requested_hat_type);
+
+                        if let Some(desired_hat) = desired_hat {
+                            let hat_instructions = SystemInstruction {
+                                client: Some(client.clone()),
+                                chat_message: Some(msg.clone()),
+                                instructions: vec![
+                                    InstructionPair {
+                                        execution_order: 0,
+                                        instruction: Instruction::CheckActive {
+                                            window_title: bot_config.game_name.clone(),
+                                        },
+                                    },
+                                    InstructionPair {
+                                        execution_order: 1,
+                                        instruction: Instruction::ConsoleCommand {
+                                            command: format!("changehat me {}", desired_hat)
+                                                .to_string(),
+                                        },
+                                    },
+                                ],
+                            };
+                            if let Err(_e) = queue_sender.send(hat_instructions) {
+                                eprintln!("Hat Channel Error");
+                            }
+                        } else {
+                            client
+                                .reply_to_privmsg(
+                                    format!(
+                                        "[{} is not a valid hat! (Valid hats: {})]",
+                                        &requested_hat_type, bot_config.valid_hat_types
+                                    ),
+                                    &msg,
+                                )
+                                .await
+                                .unwrap();
+                        }
+                    }
+                    "removehat" => {
+                        let remove_hat_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![
+                                InstructionPair {
+                                    execution_order: 0,
+                                    instruction: Instruction::CheckActive {
+                                        window_title: bot_config.game_name.clone(),
+                                    },
+                                },
+                                InstructionPair {
+                                    execution_order: 1,
+                                    instruction: Instruction::ConsoleCommand {
+                                        command: String::from("changehat me none"),
+                                    },
+                                },
+                            ],
+                        };
+                        if let Err(_e) = queue_sender.send(remove_hat_instructions) {
+                            eprintln!("Removehat Channel Error");
+                        }
+                    }
                     "rejoin" => {
                         let mod_1 = env::var("TWITCH_MOD_1")
                             .expect("$TWITCH_MOD_1 is not set")
@@ -1687,11 +1806,13 @@ pub struct BotConfig {
     game_name: String,
     game_executable: String,
     game_id: i64,
+    hat_types: HashMap<String, String>,
     tp_locations: HashMap<String, String>,
     twitch_bot_username: String,
     twitch_bot_token: String,
     player_token: String,
     twitch_channel_name: String,
+    valid_hat_types: String,
     valid_tp_locations: String,
 }
 
@@ -1704,6 +1825,7 @@ pub fn init_config() -> BotConfig {
     let twitch_bot_username: String = "sbfcamBOT".to_string();
 
     let (tp_locations, valid_tp_locations) = get_warp_locations();
+    let (hat_types, valid_hat_types) = get_hat_types();
 
     //Oauth (generated with https://twitchtokengenerator.com/):
     let twitch_bot_token = env::var("TWITCH_BOT_TOKEN").expect("$TWITCH_BOT_TOKEN is not set");
@@ -1713,11 +1835,13 @@ pub fn init_config() -> BotConfig {
         game_name,
         game_executable,
         game_id,
+        hat_types,
         tp_locations,
         twitch_bot_username,
         twitch_bot_token,
         player_token,
         twitch_channel_name,
+        valid_hat_types,
         valid_tp_locations,
     }
 }
