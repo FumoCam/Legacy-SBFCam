@@ -343,9 +343,9 @@ function update_loop(animation_speed_ms) {
 
 function changelog() {
   // START CHANGE-ME
-  const VERSION = 18;
-  const UPDATE_DATE = "2022-11-15";
-  const UPDATE_ITEMS = ["Added !hat and !removehat commands."];
+  const VERSION = 19;
+  const UPDATE_DATE = "2022-11-22";
+  const UPDATE_ITEMS = ["Added optional directions to leap ('!leap s')"];
   // END CHANGE-ME
   animateNumericalValue(
     document.getElementById("version-value"),

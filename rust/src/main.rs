@@ -10,6 +10,7 @@
 )]
 use chrono::Timelike;
 use enigo::{Enigo, Key, KeyboardControllable, MouseButton, MouseControllable};
+use phf::phf_set;
 use serde_json::json;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -27,6 +28,8 @@ use twitch_irc::transport::tcp::TCPTransport;
 use twitch_irc::transport::tcp::TLS;
 use twitch_irc::TwitchIRCClient;
 use twitch_irc::{ClientConfig, SecureTCPTransport};
+
+static VALID_DIRECTIONS: phf::Set<char> = phf_set! {'w', 'a', 's', 'd'};
 
 fn capitalize_string(s: &str) -> String {
     s[0..1].to_uppercase() + &s[1..]
@@ -92,26 +95,26 @@ fn camera_y(y_ratio: f32) {
     mouse_hide(&mut enigo);
 }
 
-fn leap(forward_amount: f64, spacebar_amount: f64) {
+fn leap(forward_amount: f64, spacebar_amount: f64, direction: char) {
     let forward_ms = (forward_amount * 1000.0).round() as u64;
     let spacebar_ms = (spacebar_amount * 1000.0).round() as u64;
     let mut enigo = Enigo::new();
     if forward_ms >= spacebar_ms {
         let forward_delay: Duration = Duration::from_millis(forward_ms - spacebar_ms);
         let spacebar_delay: Duration = Duration::from_millis(spacebar_ms);
-        enigo.key_down(Key::Layout('w'));
+        enigo.key_down(Key::Layout(direction));
         enigo.key_down(Key::Space);
         thread::sleep(spacebar_delay);
         enigo.key_up(Key::Space);
         thread::sleep(forward_delay);
-        enigo.key_up(Key::Layout('w'));
+        enigo.key_up(Key::Layout(direction));
     } else {
         let spacebar_delay: Duration = Duration::from_millis(spacebar_ms - forward_ms);
         let forward_delay: Duration = Duration::from_millis(forward_ms);
-        enigo.key_down(Key::Layout('w'));
+        enigo.key_down(Key::Layout(direction));
         enigo.key_down(Key::Space);
         thread::sleep(forward_delay);
-        enigo.key_up(Key::Layout('w'));
+        enigo.key_up(Key::Layout(direction));
         thread::sleep(spacebar_delay);
         enigo.key_up(Key::Space);
     }
@@ -360,6 +363,7 @@ pub enum Instruction {
     Leap {
         forward_amount: f64,
         spacebar_amount: f64,
+        direction: char,
     },
     MoveCameraX {
         x_ratio: f32,
@@ -494,12 +498,13 @@ pub async fn queue_processor(
                 Instruction::Leap {
                     forward_amount,
                     spacebar_amount,
+                    direction,
                 } => {
                     println!("leap");
                     if client_origin {
                         instruction_history.push(history_entry);
                     }
-                    leap(*forward_amount, *spacebar_amount);
+                    leap(*forward_amount, *spacebar_amount, *direction);
                 }
                 Instruction::MoveCameraX { x_ratio } => {
                     println!("move_camera_x");
@@ -1107,6 +1112,7 @@ pub async fn twitch_loop(
                                             // Clear any sitting effects
                                             forward_amount: 1.0,
                                             spacebar_amount: 1.0,
+                                            direction: 'w',
                                         },
                                     },
                                     InstructionPair {
@@ -1427,9 +1433,11 @@ pub async fn twitch_loop(
                         const MAX_AMOUNT: f64 = 2.0;
                         let mut forward_amount: f64 = 1.0;
                         let mut spacebar_amount: f64 = 1.0;
+                        let mut direction: char = 'w';
+                        let mut direction_first_arg = false;
                         if clean_args.len() > 1 {
-                            let num1 = clean_args[1].parse::<f64>();
-                            match num1 {
+                            let arg_1 = clean_args[1].parse::<f64>();
+                            match arg_1 {
                                 Ok(val) => {
                                     if val > MAX_AMOUNT || val <= 0.0 {
                                         client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
@@ -1437,24 +1445,59 @@ pub async fn twitch_loop(
                                     }
                                     forward_amount = val;
                                 }
-                                Err(_why) => {
-                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[1]), &msg).await.unwrap();
-                                    continue;
+                                Err(_why_float) => {
+                                    let direction_arg =
+                                        clean_args[1].to_lowercase().parse::<char>();
+                                    match direction_arg {
+                                        Ok(direction_val) => {
+                                            if VALID_DIRECTIONS.contains(&direction_val) {
+                                                direction = direction_val;
+                                                direction_first_arg = true;
+                                            } else {
+                                                client.reply_to_privmsg(format!("[{} is not a valid direction! Please specify a valid direction or leave it blank.]", clean_args[1]), &msg).await.unwrap();
+                                                continue;
+                                            }
+                                        }
+                                        Err(_why_char) => {
+                                            client.reply_to_privmsg(format!("[{} is not a valid number/direction! Please specify a number or leave it blank.]", clean_args[1]), &msg).await.unwrap();
+                                            continue;
+                                        }
+                                    }
                                 }
                             }
                         }
                         if clean_args.len() > 2 {
-                            let num1 = clean_args[2].parse::<f64>();
-                            match num1 {
+                            let arg_2 = clean_args[2].parse::<f64>();
+                            match arg_2 {
                                 Ok(val) => {
                                     if val > MAX_AMOUNT || val <= 0.0 {
                                         client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[2], MAX_AMOUNT), &msg).await.unwrap();
                                         continue;
                                     }
-                                    spacebar_amount = val;
+                                    if direction_first_arg {
+                                        forward_amount = val;
+                                    } else {
+                                        spacebar_amount = val;
+                                    }
                                 }
                                 Err(_why) => {
                                     client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[2]), &msg).await.unwrap();
+                                    continue;
+                                }
+                            }
+                        }
+                        if clean_args.len() > 3 && direction_first_arg {
+                            let arg_3 = clean_args[3].parse::<f64>();
+                            match arg_3 {
+                                Ok(val) => {
+                                    if val > MAX_AMOUNT || val <= 0.0 {
+                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[3], MAX_AMOUNT), &msg).await.unwrap();
+                                        continue;
+                                    }
+                                    spacebar_amount = val;
+                                }
+                                Err(_why) => {
+                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[3]), &msg).await.unwrap();
                                     continue;
                                 }
                             }
@@ -1474,6 +1517,7 @@ pub async fn twitch_loop(
                                     instruction: Instruction::Leap {
                                         forward_amount,
                                         spacebar_amount,
+                                        direction,
                                     },
                                 },
                             ],
@@ -1511,6 +1555,7 @@ pub async fn twitch_loop(
                                     instruction: Instruction::Leap {
                                         forward_amount: 0.0,
                                         spacebar_amount: 1.0,
+                                        direction: 'w',
                                     },
                                 },
                             ],
