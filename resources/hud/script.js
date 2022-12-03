@@ -344,8 +344,11 @@ function update_loop(animation_speed_ms) {
 function changelog() {
   // START CHANGE-ME
   const VERSION = 19;
-  const UPDATE_DATE = "2022-11-22";
-  const UPDATE_ITEMS = ["Added optional directions to leap ('!leap s')"];
+  const UPDATE_DATE = "2022-12-03";
+  const UPDATE_ITEMS = [
+    "Console-based commands like !hat and !warp may not work, use !dev if they break.",
+    "Remapped console commands to open console based on chat and mouse, since hotkey is broken",
+  ];
   // END CHANGE-ME
   animateNumericalValue(
     document.getElementById("version-value"),

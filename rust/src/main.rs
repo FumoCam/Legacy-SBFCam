@@ -207,9 +207,27 @@ fn send_user_chat(author: &str, msg: &str) {
     enigo.key_click(Key::Return);
 }
 
-fn run_console_command(command: &str) {
+fn open_console_chat() {
+    // Open console using chat commands
+    const DELAY: Duration = Duration::from_millis(300);
+    let mut enigo = Enigo::new();
+    send_system_chat(&String::from("/sbfconsole"));
+    mouse_move(&mut enigo, 0.5, 0.225);
+    thread::sleep(DELAY);
+    mouse_click(&mut enigo);
+    thread::sleep(DELAY);
+    mouse_hide(&mut enigo);
+}
+
+fn open_console_hotkey() {
+    // Open console using hotkey
     let mut enigo = Enigo::new();
     enigo.key_click(Key::Layout('\\'));
+}
+
+fn run_console_command(command: &str) {
+    open_console_chat();
+    let mut enigo = Enigo::new();
     thread::sleep(Duration::from_millis(750));
     enigo.key_sequence(command);
     thread::sleep(Duration::from_millis(750));
@@ -2901,6 +2919,7 @@ pub async fn hud_ws_server(hud_sender: UnboundedSender<HUDInstruction>) {
 // =================
 // [Production Main]
 // =================
+
 #[tokio::main]
 pub async fn main() {
     dotenv::from_filename("..\\.env").ok();
