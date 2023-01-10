@@ -344,10 +344,9 @@ function update_loop(animation_speed_ms) {
 function changelog() {
   // START CHANGE-ME
   const VERSION = 19;
-  const UPDATE_DATE = "2022-12-03";
+  const UPDATE_DATE = "2023-01-08";
   const UPDATE_ITEMS = [
-    "Console-based commands like !hat and !warp may not work, use !dev if they break.",
-    "Remapped console commands to open console based on chat and mouse, since hotkey is broken",
+    "Added new 'ice' warp.",
   ];
   // END CHANGE-ME
   animateNumericalValue(

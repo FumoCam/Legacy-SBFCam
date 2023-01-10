@@ -11,7 +11,7 @@ enigo = "0.0.14"
 winapi = "0.3.9"
 windows-win = "2.4.1"
 twitch-irc = "4.0.0"
-tokio = {version = "1.17.0", features = ["rt-multi-thread", "macros", "full", "sync"]}
+tokio = {version = "1.18.4", features = ["rt-multi-thread", "macros", "full", "sync"]}
 queues = "1.0.2"
 serde_json = "1.0.83"
 serde = { version = "1.0.143", features = ["derive"] }

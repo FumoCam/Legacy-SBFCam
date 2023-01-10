@@ -647,8 +647,9 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
     tp_locations.insert(String::from("devil"), String::from("Scarlet Devil Mansion"));
     tp_locations.insert(String::from("highway"), String::from("Highway"));
     tp_locations.insert(String::from("sewers"), String::from("Rat Sewers"));
-    tp_locations.insert(String::from("mines"), String::from("Rat Mines"));
+    tp_locations.insert(String::from("bowling"), String::from("Bowling"));
     tp_locations.insert(String::from("cave"), String::from("Cave"));
+    tp_locations.insert(String::from("ice"), String::from("Ice Town"));
 
     let valid_tp_locations = tp_locations
         .keys()

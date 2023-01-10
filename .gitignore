@@ -1,9 +1,7 @@
 .env
-target/
-rust/target/
-/python/src/__pycache__
+/rust/target
+/python/__pycache__
 /resources/selenium
-
 # "Other Resources" repository
 resources/archive_avatar_bg.png
 resources/archive_avatar.png
