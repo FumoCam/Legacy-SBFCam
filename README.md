@@ -6,11 +6,25 @@ Twitch: https://www.twitch.tv/sbfcam
 
 # A note on code quality
 
-Most people start learning languages with a "hello world" program. I skipped a step or hundred and made a Twitch bot that can emulate user input cross-platform to play a video game, as my first program.
+This was my first Rust project. I did not make a "hello world" or consult any tutorials/guides beyond what I immediately needed.
 
-I do not know how to print to console in Rust if you were to ask me to do so without googling. Hopefully that addresses any questionable design choices you see in this repository.
+This version of the bot was built off another bot in another language that was built off patches upon hacky solutions upon more patches.
+
+Architecture, good coding practices, and maintainability was the lowest priority during development.
+
+Usage of Rust was initially for novelty, but a proper redesign is in progress.
 
 # Installing
+
+## Missing files
+
+You will see README.md files in some of the resource folders with "Items not in version control".
+
+- You can find these in the private [Legacy-SBFCam-Other-Resources](https://github.com/FumoCam/Legacy-SBFCam-Other-Resources) repository.
+- If you do not have access, you can request it from me.
+- Alternatively, you can supply your own versions of the missing files, there is nothing remarkably unique.
+
+## Preamble
 
 Designed for Windows 10, the only "Desktop" mode Roblox supports.
 
