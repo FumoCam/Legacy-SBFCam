@@ -164,7 +164,7 @@ fn mouse_hide(enigo: &mut Enigo) {
 
 fn send_system_chat(msg: &str) {
     let mut enigo = Enigo::new();
-    let suffixed_msg = format!("{} ", msg); // Space suffix, to avoid cutoff
+    let suffixed_msg = format!("{msg} "); // Space suffix, to avoid cutoff
     let type_delay = Duration::from_millis(400);
     let send_delay = Duration::from_millis(150);
 
@@ -184,8 +184,8 @@ fn send_system_chat(msg: &str) {
 fn send_user_chat(author: &str, msg: &str) {
     let mut enigo = Enigo::new();
 
-    let suffixed_author = format!("{} ", author); // Space suffix, to avoid cutoff
-    let suffixed_msg = format!("{} ", msg); // Space suffix, to avoid cutoff
+    let suffixed_author = format!("{author} "); // Space suffix, to avoid cutoff
+    let suffixed_msg = format!("{msg} "); // Space suffix, to avoid cutoff
     let type_delay = Duration::from_millis(400);
     let send_delay = Duration::from_millis(150);
     let author_delay = Duration::from_millis(500);
@@ -219,12 +219,6 @@ fn open_console_chat() {
     mouse_hide(&mut enigo);
 }
 
-fn open_console_hotkey() {
-    // Open console using hotkey
-    let mut enigo = Enigo::new();
-    enigo.key_click(Key::Layout('\\'));
-}
-
 fn run_console_command(command: &str) {
     open_console_chat();
     let mut enigo = Enigo::new();
@@ -249,7 +243,7 @@ async fn discord_log(
     } else {
         "DISCORD_LOG_WEBHOOK_URL"
     };
-    let webhook_url = env::var(env_key).unwrap_or_else(|_| panic!("{} is not set", env_key));
+    let webhook_url = env::var(env_key).unwrap_or_else(|_| panic!("{env_key} is not set"));
     let webhook_data = json!({
         "embeds": [
             {
@@ -316,13 +310,13 @@ fn show_window_by_title(title: &str) -> bool {
         let window_hwnd_raw = *window_hwnd_ref;
         let success = show_window(window_hwnd_raw);
         if success {
-            println!("Successfully activated {title}!", title = title);
+            println!("Successfully activated {title}!");
         } else {
-            eprintln!("Issue in activating {title}", title = title);
+            eprintln!("Issue in activating {title}");
         }
         success
     } else {
-        eprintln!("Couldn't find a window by the name {title}", title = title);
+        eprintln!("Couldn't find a window by the name {title}");
         false
     }
 }
@@ -355,12 +349,12 @@ fn trigger_restart() {
     eprintln!("{}", String::from_utf8_lossy(&output.stderr));
 }
 fn terminate_running_exe(exe_name: &str) {
-    println!("EXE termination subprocess started ({})", exe_name);
+    println!("EXE termination subprocess started ({exe_name})");
     let output = Command::new("cmd")
         .args(["/C", "taskkill", "/f", "/IM", exe_name])
         .output()
         .expect("failed to execute Roblox termination");
-    println!("EXE termination subprocess finished ({})", exe_name);
+    println!("EXE termination subprocess finished ({exe_name})");
     println!("{}", String::from_utf8_lossy(&output.stdout));
     eprintln!("{}", String::from_utf8_lossy(&output.stderr));
 }
@@ -578,12 +572,12 @@ pub async fn queue_processor(
                     send_user_chat(author, message);
                 }
                 Instruction::Wait { amount_ms } => {
-                    println!("wait {}", amount_ms);
+                    println!("wait {amount_ms}");
                     let duration = tokio::time::Duration::from_millis(*amount_ms);
                     tokio::time::sleep(duration).await;
                 }
                 Instruction::WaitWithMessage { amount_ms, message } => {
-                    println!("wait_with_message {} {}", amount_ms, message);
+                    println!("wait_with_message {amount_ms} {message}");
 
                     if let Err(_e) = hud_sender.send(HUDInstruction::TimedMessage {
                         message: message.clone(),
@@ -609,7 +603,7 @@ pub async fn queue_processor(
                     println!("join_game_selenium {}", &server_id);
                     join_game_selenium(bot_config.game_id, server_id);
                     let loaded_in = cv_check_loaded_in(&bot_config.game_name.clone());
-                    println!("Loaded in: {}", loaded_in);
+                    println!("Loaded in: {loaded_in}");
                     if !loaded_in {
                         notify_admin("Failed to load in!").await.ok();
                     }
@@ -738,7 +732,7 @@ pub async fn get_chat(
         Ok(return_data) => Ok(Some(return_data)),
         Err(e) => {
             let error_message: String =
-                format!("[Censor Client Error - JSON]\n{:#?}\n```{}```", e, body);
+                format!("[Censor Client Error - JSON]\n{e:#?}\n```{body}```");
             eprint!("{}", &error_message);
             notify_admin(&error_message).await.ok();
             Ok(Option::None)
@@ -764,7 +758,7 @@ pub async fn twitch_loop(
     //Begin Async Loop
     match client.join(bot_config.twitch_channel_name.clone()) {
         Ok(join) => join,
-        Err(error) => panic!("Could not join the channel {:?}", error),
+        Err(error) => panic!("Could not join the channel {error:?}"),
     }
     while let Some(message) = incoming_messages.recv().await {
         if let ServerMessage::Privmsg(msg) = message {
@@ -844,7 +838,7 @@ pub async fn twitch_loop(
                             continue;
                         }
 
-                        println!("{}: {}", author_name.to_lowercase(), message);
+                        println!("{}: {message}", author_name.to_lowercase());
 
                         let success = check_active(&bot_config.game_name);
                         if !success {
@@ -859,7 +853,7 @@ pub async fn twitch_loop(
                             continue;
                         }
                         if message.starts_with('/') {
-                            println!("Sending chat command from '{}'\n{}", author_name, message);
+                            println!("Sending chat command from '{author_name}'\n{message}");
                             let chat_command_instructions = SystemInstruction {
                                 client: Some(client.clone()),
                                 chat_message: Some(msg.clone()),
@@ -880,7 +874,7 @@ pub async fn twitch_loop(
                                 eprintln!("Chat Command Channel Error");
                             }
                         } else {
-                            println!("Sending chat message\n{}: {}", author_name, message);
+                            println!("Sending chat message\n{author_name}: {message}");
                             let chat_result_raw = get_chat(author_name, message).await;
                             let chat_result: CensorClientReturn;
                             match chat_result_raw {
@@ -894,7 +888,7 @@ pub async fn twitch_loop(
                                 }
                                 Err(error) => {
                                     let error_message: String =
-                                        format!("[Censor Client Error - Main]\n```{:#?}```", error);
+                                        format!("[Censor Client Error - Main]\n```{error:#?}```");
                                     eprint!("{}", &error_message);
                                     notify_admin(&error_message).await.ok();
 
@@ -903,7 +897,7 @@ pub async fn twitch_loop(
                                 }
                             }
                             for bot_message in &chat_result.bot_reply_message {
-                                println!("Replying: '{}'", bot_message);
+                                println!("Replying: '{bot_message}'");
                                 client
                                     .reply_to_privmsg(bot_message.clone(), &msg)
                                     .await
@@ -915,7 +909,7 @@ pub async fn twitch_loop(
                             }
                             let censored_username: String = format!("{}:", chat_result.username);
                             let censored_message: String = chat_result.message.to_string();
-                            println!("{}: {}", censored_username, censored_message);
+                            println!("{censored_username}: {censored_message}");
 
                             let chat_command_instructions = SystemInstruction {
                                 client: Some(client.clone()),
@@ -974,8 +968,8 @@ pub async fn twitch_loop(
                         }
 
                         let capitalized_message = capitalize_string(&message);
-                        let formatted_message = format!("[{}]", capitalized_message);
-                        println!("Sending announce\n{}", formatted_message);
+                        let formatted_message = format!("[{capitalized_message}]");
+                        println!("Sending announce\n{formatted_message}");
                         let announce_instructions = SystemInstruction {
                             client: Some(client.clone()),
                             chat_message: Some(msg.clone()),
@@ -1059,7 +1053,7 @@ pub async fn twitch_loop(
                             match num {
                                 Ok(val) => {
                                     if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[2], MAX_AMOUNT), &msg).await.unwrap();
+                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[2]), &msg).await.unwrap();
                                         continue;
                                     }
                                     amount = val;
@@ -1121,7 +1115,7 @@ pub async fn twitch_loop(
                                     InstructionPair {
                                         execution_order: 1,
                                         instruction: Instruction::SystemChatMessage {
-                                            message: format!("[Warping to {}!]", desired_location)
+                                            message: format!("[Warping to {desired_location}!]")
                                                 .to_string(),
                                         },
                                     },
@@ -1137,8 +1131,7 @@ pub async fn twitch_loop(
                                     InstructionPair {
                                         execution_order: 1,
                                         instruction: Instruction::ConsoleCommand {
-                                            command: format!("warp {}", desired_location)
-                                                .to_string(),
+                                            command: format!("warp {desired_location}").to_string(),
                                         },
                                     },
                                 ],
@@ -1168,7 +1161,7 @@ pub async fn twitch_loop(
                         match num {
                             Ok(val) => {
                                 if val > MAX_AMOUNT || val <= 0.0 {
-                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
                                     continue;
                                 }
                                 amount = val;
@@ -1216,7 +1209,7 @@ pub async fn twitch_loop(
                         match num {
                             Ok(val) => {
                                 if val > MAX_AMOUNT || val <= 0.0 {
-                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
                                     continue;
                                 }
                                 amount = val;
@@ -1266,7 +1259,7 @@ pub async fn twitch_loop(
                         match num {
                             Ok(val) => {
                                 if val > MAX_AMOUNT || val <= 0.0 {
-                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
                                     continue;
                                 }
                                 amount = val;
@@ -1314,7 +1307,7 @@ pub async fn twitch_loop(
                         match num {
                             Ok(val) => {
                                 if val > MAX_AMOUNT || val <= 0.0 {
-                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
                                     continue;
                                 }
                                 amount = val;
@@ -1364,7 +1357,7 @@ pub async fn twitch_loop(
                         match num {
                             Ok(val) => {
                                 if val > MAX_AMOUNT || val <= 0.0 {
-                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
                                     continue;
                                 }
                                 amount = val;
@@ -1415,7 +1408,7 @@ pub async fn twitch_loop(
                         match num {
                             Ok(val) => {
                                 if val > MAX_AMOUNT || val <= 0.0 {
-                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
                                     continue;
                                 }
                                 amount = val;
@@ -1459,7 +1452,7 @@ pub async fn twitch_loop(
                             match arg_1 {
                                 Ok(val) => {
                                     if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[1], MAX_AMOUNT), &msg).await.unwrap();
+                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
                                         continue;
                                     }
                                     forward_amount = val;
@@ -1490,7 +1483,7 @@ pub async fn twitch_loop(
                             match arg_2 {
                                 Ok(val) => {
                                     if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[2], MAX_AMOUNT), &msg).await.unwrap();
+                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[2]), &msg).await.unwrap();
                                         continue;
                                     }
                                     if direction_first_arg {
@@ -1510,7 +1503,7 @@ pub async fn twitch_loop(
                             match arg_3 {
                                 Ok(val) => {
                                     if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {}.]", clean_args[3], MAX_AMOUNT), &msg).await.unwrap();
+                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[3]), &msg).await.unwrap();
                                         continue;
                                     }
                                     spacebar_amount = val;
@@ -1778,7 +1771,7 @@ pub async fn twitch_loop(
                                     InstructionPair {
                                         execution_order: 1,
                                         instruction: Instruction::ConsoleCommand {
-                                            command: format!("changehat me {}", desired_hat)
+                                            command: format!("changehat me {desired_hat}")
                                                 .to_string(),
                                         },
                                     },
@@ -2014,20 +2007,20 @@ pub async fn get_instances(game_id: i64) -> Result<Option<Vec<GameInstance>>, Bo
     let body_json: serde_json::Value = serde_json::from_str(&body)?;
 
     let debug_body = serde_json::to_string_pretty(&body_json).unwrap();
-    println!("Body:\n{}", debug_body);
+    println!("Body:\n{debug_body}");
 
     if !(body_json.is_object()) {
-        eprint!("Error, body not an object\n{}", body);
+        eprint!("Error, body not an object\n{body}");
         return Ok(Option::None);
     }
     let body_obj = body_json.as_object().unwrap();
     if !(body_obj.contains_key("data")) {
-        eprint!("Error, missing data\n{}", body);
+        eprint!("Error, missing data\n{body}");
         return Ok(Option::None);
     }
     let response_data = body_obj.get("data").unwrap();
     if !(response_data.is_array()) {
-        eprint!("Error, data not array\n{}", body);
+        eprint!("Error, data not array\n{body}");
         return Ok(Option::None);
     }
     let data = response_data.as_array().unwrap();
@@ -2116,8 +2109,8 @@ fn check_in_best_server(player_token: &String, instance_list: Vec<GameInstance>)
         HIGH_SWITCH
     };
     let difference = best_server.players.len() - current_server.players.len();
-    println!("[Server difference {}]", difference);
-    println!("[Required switch difference {}]", required_difference);
+    println!("[Server difference {difference}]");
+    println!("[Required switch difference {required_difference}]");
     difference <= required_difference
 }
 
@@ -2286,7 +2279,7 @@ async fn server_check_logic(
 
         let is_active = check_active(&bot_config.game_name.clone());
         let exe_status = if is_active { "Running" } else { "Not found" };
-        let message = format!("Likely crash detected | {}", exe_status);
+        let message = format!("Likely crash detected | {exe_status}");
         notify_admin(&message).await.ok();
 
         instructions = vec![
@@ -2475,132 +2468,13 @@ pub fn restart_logic(
     }
 }
 
-// Start Temperature/OpenHardwareMonitor Code
-#[allow(non_snake_case)]
-#[derive(serde::Serialize, serde::Deserialize)]
-struct OpenHardwareMonitorSensorValue {
-    id: i32,
-    Text: String,
-    // Children: Vec<serde_json::Value>,
-    Min: String,
-    Value: String,
-    Max: String,
-    ImageURL: String,
-}
-#[allow(non_snake_case)]
-#[derive(serde::Serialize, serde::Deserialize)]
-struct OpenHardwareMonitorSensorType {
-    id: i32,
-    Text: String,
-    Children: Vec<OpenHardwareMonitorSensorValue>,
-    Min: String,
-    Value: String,
-    Max: String,
-    ImageURL: String,
-}
-#[allow(non_snake_case)]
-#[derive(serde::Serialize, serde::Deserialize)]
-struct OpenHardwareMonitorHardware {
-    id: i32,
-    Text: String,
-    Children: Vec<OpenHardwareMonitorSensorType>,
-    Min: String,
-    Value: String,
-    Max: String,
-    ImageURL: String,
-}
-#[allow(non_snake_case)]
-#[derive(serde::Serialize, serde::Deserialize)]
-struct OpenHardwareMonitorComputer {
-    id: i32,
-    Text: String,
-    Children: Vec<OpenHardwareMonitorHardware>,
-    Min: String,
-    Value: String,
-    Max: String,
-    ImageURL: String,
-}
-#[allow(non_snake_case)]
-#[derive(serde::Serialize, serde::Deserialize)]
-struct OpenHardwareMonitorBase {
-    id: i32,
-    Text: String,
-    Children: Vec<OpenHardwareMonitorComputer>,
-    Min: String,
-    Value: String,
-    Max: String,
-    ImageURL: String,
-}
-
-pub async fn get_hardware_data() -> Result<Option<String>, Box<dyn Error>> {
-    // Assumes a running OpenHardwareMonitor reporting server. Ring0 in rust is not worth it.
-    // https://openhardwaremonitor.org/downloads/
-    let api_url: String = String::from("http://localhost:8085/data.json");
-    let response = reqwest::get(api_url).await?;
-
-    if !(&response.status().is_success()) {
-        eprint!("Error\n{}", response.text().await?);
-        return Ok(Option::None);
-    }
-    let body = response.text().await?;
-
-    match serde_json::from_str::<OpenHardwareMonitorBase>(&body) {
-        Ok(report_data) => {
-            let mut cpu_temp = "";
-            let mut cpu_load = "";
-            let hardware_list = &report_data.Children[0].Children;
-            for hardware_item in hardware_list {
-                let sensor_types = &hardware_item.Children;
-                for sensor_type in sensor_types {
-                    if sensor_type.Text != "Temperatures" && sensor_type.Text != "Load" {
-                        continue;
-                    }
-                    let sensors = &sensor_type.Children;
-                    for sensor in sensors {
-                        if sensor.Text == "CPU Package" {
-                            cpu_temp = &sensor.Value;
-                        } else if sensor.Text == "CPU Total" {
-                            cpu_load = &sensor.Value;
-                        } else if !cpu_temp.is_empty() && !cpu_load.is_empty() {
-                            // We got what we wanted
-                            break;
-                        }
-                    }
-                }
-            }
-            if cpu_temp.is_empty() {
-                cpu_temp = "ERR";
-            }
-            if cpu_load.is_empty() {
-                cpu_load = "ERR";
-            }
-            let response_json = json!(
-                {
-                    "cpu_temp": cpu_temp.to_string(),
-                    "cpu_load": cpu_load.to_string()
-                }
-            );
-            let response_json_str = serde_json::to_string(&response_json).unwrap();
-            Ok(Some(response_json_str))
-        }
-        Err(e) => {
-            println!("{}", body);
-            eprintln!("Error! {:#?}", e);
-            Ok(Option::None)
-        }
-    }
-}
-
 pub async fn clock_tick_loop(
     queue_sender: UnboundedSender<SystemInstruction>,
-    hud_sender: UnboundedSender<HUDInstruction>,
+    _hud_sender: UnboundedSender<HUDInstruction>,
     bot_config: BotConfig,
 ) {
     let mut interval = tokio::time::interval(Duration::from_millis(1000));
     let mut restart_warn_ticker = -1; // TODO: This needs a way cleaner system
-    let hw_stat_error_val = String::from("{'cpu_temp': 'ERR', 'cpu_load': 'ERR'}");
-    let mut hw_stat_loop = 0;
-    const HW_STAT_LOOP_MAX: i32 = 2;
     loop {
         interval.tick().await;
 
@@ -2609,34 +2483,6 @@ pub async fn clock_tick_loop(
         if restart_warn_ticker != restart_return && restart_return != -1 {
             restart_warn_ticker = restart_return;
             restart_logic(&queue_sender, bot_config.clone(), restart_return);
-        }
-
-        // Hardware stats logic
-        if hw_stat_loop < HW_STAT_LOOP_MAX {
-            // Only check for/send updates every HW_STAT_LOOP_MAX seconds
-            hw_stat_loop += 1;
-            continue;
-        }
-        hw_stat_loop = 0;
-        let hw_stat_result = get_hardware_data().await;
-        let hw_stat_data: String;
-        match hw_stat_result {
-            Ok(valid_result) => {
-                if let Some(result) = valid_result {
-                    hw_stat_data = result;
-                } else {
-                    eprintln!("[Open Hardware Monitor query failed]");
-                    hw_stat_data = hw_stat_error_val.clone();
-                }
-            }
-            Err(error) => {
-                eprintln!("[Open Hardware Monitor query error]\n{}", error);
-                hw_stat_data = hw_stat_error_val.clone();
-            }
-        }
-        if let Err(_e) = hud_sender.send(HUDInstruction::SystemMonitorUpdate { data: hw_stat_data })
-        {
-            eprintln!("[HUD] System Monitor Update Channel Error");
         }
     }
 }
@@ -2680,11 +2526,11 @@ fn get_pixel(
     eprintln!("{}", String::from_utf8_lossy(&output.stderr));
     match serde_json::from_str::<bool>(&String::from_utf8_lossy(&output.stdout)) {
         Ok(return_val) => {
-            println!("Pixel Response: {}", return_val);
+            println!("Pixel Response: {return_val}");
             return_val
         }
         Err(e) => {
-            eprintln!("Error! {:#?}", e);
+            eprintln!("Error! {e:#?}");
             false
         }
     }
@@ -2801,9 +2647,6 @@ pub enum HUDInstruction {
         message: String,
         time: u64,
     },
-    SystemMonitorUpdate {
-        data: String,
-    },
 }
 pub async fn hud_loop(mut hud_receiver: UnboundedReceiver<HUDInstruction>) {
     let mut clients: HashMap<u64, simple_websockets::Responder> = HashMap::new();
@@ -2821,10 +2664,10 @@ pub async fn hud_loop(mut hud_receiver: UnboundedReceiver<HUDInstruction>) {
                 clients.remove(&client_id);
             }
             HUDInstruction::ClientMessage { message } => {
-                println!("[HUD] ClientMessage: {}", message);
+                println!("[HUD] ClientMessage: {message}");
             }
             HUDInstruction::ClientBinaryMessage { binary_message } => {
-                println!("[HUD] ClientBinaryMessage: {:?}", binary_message);
+                println!("[HUD] ClientBinaryMessage: {binary_message:?}");
             }
             HUDInstruction::GenericMessage { message } => {
                 println!(
@@ -2854,23 +2697,6 @@ pub async fn hud_loop(mut hud_receiver: UnboundedReceiver<HUDInstruction>) {
                         .send(simple_websockets::Message::Text(message_obj.to_string()));
                 }
             }
-            HUDInstruction::SystemMonitorUpdate { data } => {
-                // println!(
-                //     "[HUD] Sending system monitor update to all connected clients ({}): {}",
-                //     clients.len(),
-                //     data
-                // );
-                let message_obj = json!({
-                    "type": "system_monitor_update",
-                    "value": {
-                        "data": data
-                    }
-                });
-                for client_responder in clients.values() {
-                    client_responder
-                        .send(simple_websockets::Message::Text(message_obj.to_string()));
-                }
-            }
         }
     }
 }
@@ -2879,7 +2705,7 @@ pub async fn hud_ws_server(hud_sender: UnboundedSender<HUDInstruction>) {
     loop {
         match event_hub.poll_async().await {
             simple_websockets::Event::Connect(client_id, responder) => {
-                println!("[HUD] A client connected with id #{}", client_id);
+                println!("[HUD] A client connected with id #{client_id}");
                 if let Err(_e) = hud_sender.send(HUDInstruction::AddClient {
                     client_id,
                     responder,
@@ -2888,7 +2714,7 @@ pub async fn hud_ws_server(hud_sender: UnboundedSender<HUDInstruction>) {
                 }
             }
             simple_websockets::Event::Disconnect(client_id) => {
-                println!("[HUD] A client connected with id #{}", client_id);
+                println!("[HUD] A client connected with id #{client_id}");
                 if let Err(_e) = hud_sender.send(HUDInstruction::RemoveClient { client_id }) {
                     eprintln!("[HUD] Client Disconnect Channel Error");
                 }
