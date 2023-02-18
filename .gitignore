@@ -1,14 +1,10 @@
 .env
 /rust/target
 /python/__pycache__
+/python/.python-version
 /resources/selenium
-# "Other Resources" repository
-resources/archive_avatar_bg.png
-resources/archive_avatar.png
-resources/avatar_zoomedout.jpg
-resources/avatar.jpg
-resources/OBS_Default_720p.json
-resources/warp_map.jpg
-resources/warp_map.zip
-# HUD repository
-hud/*
+
+# Related repos
+resources/private
+censor/
+hud/

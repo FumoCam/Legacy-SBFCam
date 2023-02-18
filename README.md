@@ -18,11 +18,11 @@ Usage of Rust was initially for novelty, but a proper redesign is in progress.
 
 ## Missing files
 
-You will see README.md files in some of the resource folders with "Items not in version control".
+There are some resources (like the OBS profile) that are in a private repository. They are not required, and more like
+assets than anything.
 
-- You can find these in the private [Legacy-SBFCam-Other-Resources](https://github.com/FumoCam/Legacy-SBFCam-Other-Resources) repository.
-- If you do not have access, you can request it from me.
-- Alternatively, you can supply your own versions of the missing files, there is nothing remarkably unique.
+- You can find these in the private [Legacy-SBFCam-PrivateResources](Legacy-SBFCam-PrivateResources) repository.
+- If you do not have access, you can raise an issue to request it from me.
 
 ## Preamble
 

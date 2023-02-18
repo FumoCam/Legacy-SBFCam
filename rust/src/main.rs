@@ -123,7 +123,7 @@ fn leap(forward_amount: f64, spacebar_amount: f64, direction: char) {
 fn navbar_grief() {
     const DELAY: Duration = Duration::from_millis(300);
     let mut enigo = Enigo::new();
-    mouse_move(&mut enigo, 0.62, 0.93);
+    mouse_move(&mut enigo, 0.62, 0.95);
     thread::sleep(DELAY);
     mouse_click(&mut enigo);
     thread::sleep(DELAY);
@@ -133,11 +133,11 @@ fn navbar_grief() {
 fn navbar_sit() {
     const DELAY: Duration = Duration::from_millis(300);
     let mut enigo = Enigo::new();
-    mouse_move(&mut enigo, 0.25, 0.93);
+    mouse_move(&mut enigo, 0.25, 0.95);
     thread::sleep(DELAY);
     mouse_click(&mut enigo);
     thread::sleep(DELAY);
-    mouse_hide(&mut enigo);
+    //mouse_hide(&mut enigo);
 }
 
 fn mouse_move(enigo: &mut Enigo, x_ratio: f32, y_ratio: f32) {
@@ -269,10 +269,7 @@ async fn notify_admin(
     let mut webhook_data = HashMap::new();
     webhook_data.insert(
         "content",
-        format!(
-            "<@{}>\n{}\n<https://twitch.tv/sbfcam>",
-            author_discord_id, message
-        ),
+        format!("<@{author_discord_id}>\n{message}\n<https://twitch.tv/sbfcam>"),
     );
     let client = reqwest::Client::new();
     let _resp = client.post(webhook_url).json(&webhook_data).send().await?;
@@ -474,9 +471,9 @@ pub async fn queue_processor(
                         if let (Some(client), Some(chat_message)) = (&client_opt, &chat_message_opt)
                         {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Failed to find Roblox! Notified dev.]"),
+                                .say_in_reply_to(
                                     chat_message,
+                                    String::from("[Failed to find Roblox! Notified dev.]"),
                                 )
                                 .await
                                 .unwrap();
@@ -708,6 +705,7 @@ pub async fn get_chat(
     username: String,
     message: String,
 ) -> Result<Option<CensorClientReturn>, Box<dyn Error>> {
+    println!("test");
     let api_url: String = String::from("http://127.0.0.1:8086/request_censored_message");
     let request_body = json!({
         "username": username,
@@ -715,6 +713,7 @@ pub async fn get_chat(
     });
 
     let client = reqwest::Client::new();
+    println!("test2");
     let response = client.post(api_url).json(&request_body).send().await?;
 
     if !(&response.status().is_success()) {
@@ -778,18 +777,18 @@ pub async fn twitch_loop(
                             eprintln!("HUD Channel Error");
                         }
                         client
-                            .reply_to_privmsg(String::from("pong"), &msg)
+                            .say_in_reply_to(&msg, String::from("pong"))
                             .await
                             .unwrap();
                     }
                     "help" => {
                         client
-                            .reply_to_privmsg(
+                            .say_in_reply_to(
+                                &msg,
                                 format!(
                                     "For a full list of commands, visit {} . If you just want to play around, try '!m hello', '!move w 2', or '!warp poolside'",
                                     "https://sbf.fumocam.xyz/commands"
                                 ),
-                                &msg,
                             )
                             .await.unwrap();
                     }
@@ -799,9 +798,9 @@ pub async fn twitch_loop(
                         let message = msg_args.join(" ");
                         if message.is_empty() {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Specify a message! (i.e. !m hello)]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Specify a message! (i.e. !m hello)]"),
                                 )
                                 .await
                                 .unwrap();
@@ -827,11 +826,11 @@ pub async fn twitch_loop(
                         {
                             // Disable command usage for non-mods
                             client
-                                .reply_to_privmsg(
+                                .say_in_reply_to(
+                                    &msg,
                                     String::from(
                                         "[You cannot run commands other than /e or /animspeed!]",
                                     ),
-                                    &msg,
                                 )
                                 .await
                                 .unwrap();
@@ -844,9 +843,9 @@ pub async fn twitch_loop(
                         if !success {
                             notify_admin("Failed to find Roblox!").await.ok();
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Failed to find Roblox! Notified dev.]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Failed to find Roblox! Notified dev.]"),
                                 )
                                 .await
                                 .unwrap();
@@ -881,8 +880,9 @@ pub async fn twitch_loop(
                                 Ok(valid_result) => {
                                     if let Some(result) = valid_result {
                                         chat_result = result;
+                                        println!("gpt hjre");
                                     } else {
-                                        client.reply_to_privmsg(String::from("[Something went wrong, can't send a message. Contacting dev...]"), &msg).await.unwrap();
+                                        client.say_in_reply_to(&msg, String::from("[Something went wrong, can't send a message. Contacting dev...]")).await.unwrap();
                                         continue;
                                     }
                                 }
@@ -892,14 +892,14 @@ pub async fn twitch_loop(
                                     eprint!("{}", &error_message);
                                     notify_admin(&error_message).await.ok();
 
-                                    client.reply_to_privmsg(String::from("[Something went wrong, can't send a message. Contacting dev...]"), &msg).await.unwrap();
+                                    client.say_in_reply_to(&msg, String::from("[Something went wrong, can't send a message. Contacting dev...]")).await.unwrap();
                                     continue;
                                 }
                             }
                             for bot_message in &chat_result.bot_reply_message {
                                 println!("Replying: '{bot_message}'");
                                 client
-                                    .reply_to_privmsg(bot_message.clone(), &msg)
+                                    .say_in_reply_to(&msg, bot_message.clone())
                                     .await
                                     .unwrap();
                             }
@@ -944,9 +944,9 @@ pub async fn twitch_loop(
 
                         if author_name.to_lowercase() != mod_1.to_lowercase() {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[You do not have permissions to run this!]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[You do not have permissions to run this!]"),
                                 )
                                 .await
                                 .unwrap();
@@ -958,9 +958,9 @@ pub async fn twitch_loop(
                         let message = msg_args.join(" ");
                         if message.is_empty() {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Specify a message! (i.e. !a hello)]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Specify a message! (i.e. !a hello)]"),
                                 )
                                 .await
                                 .unwrap();
@@ -1000,7 +1000,7 @@ pub async fn twitch_loop(
                         );
                         if message.is_empty() {
                             client
-                                .reply_to_privmsg(String::from("[Specify a message, this command is for emergencies! (Please do not misuse it)]"), &msg)
+                                .say_in_reply_to(&msg, String::from("[Specify a message, this command is for emergencies! (Please do not misuse it)]"))
                                 .await
                                 .unwrap();
                             continue;
@@ -1008,12 +1008,12 @@ pub async fn twitch_loop(
                         let result = notify_admin(&message).await;
                         if result.is_ok() {
                             client
-                                .reply_to_privmsg(String::from("[Notified dev! As a reminder, this command is only for emergencies. If you were unaware of this and used the command by mistake, please write a message explaining that or you may be timed-out/banned.]"), &msg)
+                                .say_in_reply_to(&msg, String::from("[Notified dev! As a reminder, this command is only for emergencies. If you were unaware of this and used the command by mistake, please write a message explaining that or you may be timed-out/banned.]"))
                                 .await
                                 .unwrap();
                         } else {
                             client
-                                .reply_to_privmsg(String::from("[Error! Was unable to notify dev. Please join the Discord and ping CamDev.]"), &msg)
+                                .say_in_reply_to(&msg, String::from("[Error! Was unable to notify dev. Please join the Discord and ping CamDev.]"))
                                 .await
                                 .unwrap();
                         }
@@ -1021,9 +1021,9 @@ pub async fn twitch_loop(
                     "move" => {
                         if clean_args.len() < 2 {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Specify a direction! (i.e. !move w 1)]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Specify a direction! (i.e. !move w 1)]"),
                                 )
                                 .await
                                 .unwrap();
@@ -1038,9 +1038,9 @@ pub async fn twitch_loop(
                         let direction = clean_args[1].to_lowercase();
                         if !valid_directions.contains(&direction) {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Invalid direction! Specify a proper direction. (w, a, s, d)]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Invalid direction! Specify a proper direction. (w, a, s, d)]"),
                                 )
                                 .await
                                 .unwrap();
@@ -1053,13 +1053,13 @@ pub async fn twitch_loop(
                             match num {
                                 Ok(val) => {
                                     if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[2]), &msg).await.unwrap();
+                                        client.say_in_reply_to(&msg, format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[2])).await.unwrap();
                                         continue;
                                     }
                                     amount = val;
                                 }
                                 Err(_why) => {
-                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[2]), &msg).await.unwrap();
+                                    client.say_in_reply_to(&msg, format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[2])).await.unwrap();
                                     continue;
                                 }
                             }
@@ -1091,9 +1091,10 @@ pub async fn twitch_loop(
                     "warp" => {
                         if clean_args.len() < 2 {
                             client
-                                .reply_to_privmsg(
-                                    format!("[Specify a location! Map: https://sbf.fumocam.xyz/warp-map (Valid locations: {})]", bot_config.valid_tp_locations),
+                                .say_in_reply_to(
                                     &msg,
+                                    format!("[Specify a location! Map: https://sbf.fumocam.xyz/warp-map (Valid locations: {})]", bot_config.valid_tp_locations),
+                                    
                                 )
                                 .await
                                 .unwrap();
@@ -1140,15 +1141,15 @@ pub async fn twitch_loop(
                                 eprintln!("Warp Channel Error");
                             }
                         } else {
-                            client.reply_to_privmsg(format!("[{} is not a valid location! Map: https://sbf.fumocam.xyz/warp-map (Valid locations: {})]", clean_args[1], bot_config.valid_tp_locations), &msg).await.unwrap();
+                            client.say_in_reply_to(&msg, format!("[{} is not a valid location! Map: https://sbf.fumocam.xyz/warp-map (Valid locations: {})]", clean_args[1], bot_config.valid_tp_locations)).await.unwrap();
                         }
                     }
                     "left" => {
                         if clean_args.len() < 2 {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Specify degrees to rotate! (i.e. !left 90)]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Specify degrees to rotate! (i.e. !left 90)]"),
                                 )
                                 .await
                                 .unwrap();
@@ -1161,13 +1162,13 @@ pub async fn twitch_loop(
                         match num {
                             Ok(val) => {
                                 if val > MAX_AMOUNT || val <= 0.0 {
-                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
+                                    client.say_in_reply_to(&msg, format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1])).await.unwrap();
                                     continue;
                                 }
                                 amount = val;
                             }
                             Err(_why) => {
-                                client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 90.]", clean_args[1]), &msg).await.unwrap();
+                                client.say_in_reply_to(&msg, format!("[{} is not a valid number! Please specify a number, i.e. 90.]", clean_args[1])).await.unwrap();
                                 continue;
                             }
                         }
@@ -1194,9 +1195,9 @@ pub async fn twitch_loop(
                     "right" => {
                         if clean_args.len() < 2 {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Specify degrees to rotate! (i.e. !right 90)]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Specify degrees to rotate! (i.e. !right 90)]"),
                                 )
                                 .await
                                 .unwrap();
@@ -1209,13 +1210,13 @@ pub async fn twitch_loop(
                         match num {
                             Ok(val) => {
                                 if val > MAX_AMOUNT || val <= 0.0 {
-                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
+                                    client.say_in_reply_to(&msg, format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1])).await.unwrap();
                                     continue;
                                 }
                                 amount = val;
                             }
                             Err(_why) => {
-                                client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 90.]", clean_args[1]), &msg).await.unwrap();
+                                client.say_in_reply_to(&msg, format!("[{} is not a valid number! Please specify a number, i.e. 90.]", clean_args[1]), ).await.unwrap();
                                 continue;
                             }
                         }
@@ -1244,9 +1245,9 @@ pub async fn twitch_loop(
                     "up" => {
                         if clean_args.len() < 2 {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Specify degrees to rotate! (i.e. !up 45)]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Specify degrees to rotate! (i.e. !up 45)]"),
                                 )
                                 .await
                                 .unwrap();
@@ -1259,13 +1260,13 @@ pub async fn twitch_loop(
                         match num {
                             Ok(val) => {
                                 if val > MAX_AMOUNT || val <= 0.0 {
-                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
+                                    client.say_in_reply_to(&msg, format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1])).await.unwrap();
                                     continue;
                                 }
                                 amount = val;
                             }
                             Err(_why) => {
-                                client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 45.]", clean_args[1]), &msg).await.unwrap();
+                                client.say_in_reply_to(&msg, format!("[{} is not a valid number! Please specify a number, i.e. 45.]", clean_args[1])).await.unwrap();
                                 continue;
                             }
                         }
@@ -1292,9 +1293,9 @@ pub async fn twitch_loop(
                     "down" => {
                         if clean_args.len() < 2 {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Specify degrees to rotate! (i.e. !down 45)]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Specify degrees to rotate! (i.e. !down 45)]"),
                                 )
                                 .await
                                 .unwrap();
@@ -1307,13 +1308,13 @@ pub async fn twitch_loop(
                         match num {
                             Ok(val) => {
                                 if val > MAX_AMOUNT || val <= 0.0 {
-                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
+                                    client.say_in_reply_to(&msg, format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1])).await.unwrap();
                                     continue;
                                 }
                                 amount = val;
                             }
                             Err(_why) => {
-                                client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 45.]", clean_args[1]), &msg).await.unwrap();
+                                client.say_in_reply_to(&msg, format!("[{} is not a valid number! Please specify a number, i.e. 45.]", clean_args[1]) ).await.unwrap();
                                 continue;
                             }
                         }
@@ -1342,9 +1343,9 @@ pub async fn twitch_loop(
                     "zoomin" => {
                         if clean_args.len() < 2 {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Specify percent to zoom in! (i.e. !zoomin 50)]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Specify percent to zoom in! (i.e. !zoomin 50)]"),
                                 )
                                 .await
                                 .unwrap();
@@ -1357,13 +1358,13 @@ pub async fn twitch_loop(
                         match num {
                             Ok(val) => {
                                 if val > MAX_AMOUNT || val <= 0.0 {
-                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
+                                    client.say_in_reply_to(&msg, format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1])).await.unwrap();
                                     continue;
                                 }
                                 amount = val;
                             }
                             Err(_why) => {
-                                client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 45.]", clean_args[1]), &msg).await.unwrap();
+                                client.say_in_reply_to(&msg, format!("[{} is not a valid number! Please specify a number, i.e. 45.]", clean_args[1])).await.unwrap();
                                 continue;
                             }
                         }
@@ -1393,9 +1394,9 @@ pub async fn twitch_loop(
                     "zoomout" => {
                         if clean_args.len() < 2 {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Specify percent to zoom in! (i.e. !zoomin 50)]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Specify percent to zoom in! (i.e. !zoomin 50)]"),
                                 )
                                 .await
                                 .unwrap();
@@ -1408,13 +1409,13 @@ pub async fn twitch_loop(
                         match num {
                             Ok(val) => {
                                 if val > MAX_AMOUNT || val <= 0.0 {
-                                    client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
+                                    client.say_in_reply_to(&msg, format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1])).await.unwrap();
                                     continue;
                                 }
                                 amount = val;
                             }
                             Err(_why) => {
-                                client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number, i.e. 50.]", clean_args[1]), &msg).await.unwrap();
+                                client.say_in_reply_to(&msg, format!("[{} is not a valid number! Please specify a number, i.e. 50.]", clean_args[1])).await.unwrap();
                                 continue;
                             }
                         }
@@ -1452,7 +1453,7 @@ pub async fn twitch_loop(
                             match arg_1 {
                                 Ok(val) => {
                                     if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1]), &msg).await.unwrap();
+                                        client.say_in_reply_to(&msg, format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[1])).await.unwrap();
                                         continue;
                                     }
                                     forward_amount = val;
@@ -1466,12 +1467,12 @@ pub async fn twitch_loop(
                                                 direction = direction_val;
                                                 direction_first_arg = true;
                                             } else {
-                                                client.reply_to_privmsg(format!("[{} is not a valid direction! Please specify a valid direction or leave it blank.]", clean_args[1]), &msg).await.unwrap();
+                                                client.say_in_reply_to(&msg, format!("[{} is not a valid direction! Please specify a valid direction or leave it blank.]", clean_args[1])).await.unwrap();
                                                 continue;
                                             }
                                         }
                                         Err(_why_char) => {
-                                            client.reply_to_privmsg(format!("[{} is not a valid number/direction! Please specify a number or leave it blank.]", clean_args[1]), &msg).await.unwrap();
+                                            client.say_in_reply_to(&msg, format!("[{} is not a valid number/direction! Please specify a number or leave it blank.]", clean_args[1])).await.unwrap();
                                             continue;
                                         }
                                     }
@@ -1483,7 +1484,7 @@ pub async fn twitch_loop(
                             match arg_2 {
                                 Ok(val) => {
                                     if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[2]), &msg).await.unwrap();
+                                        client.say_in_reply_to(&msg, format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[2]),).await.unwrap();
                                         continue;
                                     }
                                     if direction_first_arg {
@@ -1493,7 +1494,7 @@ pub async fn twitch_loop(
                                     }
                                 }
                                 Err(_why) => {
-                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[2]), &msg).await.unwrap();
+                                    client.say_in_reply_to(&msg, format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[2])).await.unwrap();
                                     continue;
                                 }
                             }
@@ -1503,13 +1504,13 @@ pub async fn twitch_loop(
                             match arg_3 {
                                 Ok(val) => {
                                     if val > MAX_AMOUNT || val <= 0.0 {
-                                        client.reply_to_privmsg(format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[3]), &msg).await.unwrap();
+                                        client.say_in_reply_to(&msg, format!("[{} is too high/low! Please specify a number between 0 or {MAX_AMOUNT}.]", clean_args[3])).await.unwrap();
                                         continue;
                                     }
                                     spacebar_amount = val;
                                 }
                                 Err(_why) => {
-                                    client.reply_to_privmsg(format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[3]), &msg).await.unwrap();
+                                    client.say_in_reply_to(&msg, format!("[{} is not a valid number! Please specify a number or leave it blank.]", clean_args[3])).await.unwrap();
                                     continue;
                                 }
                             }
@@ -1690,9 +1691,9 @@ pub async fn twitch_loop(
                     "size" => {
                         if clean_args.len() < 2 {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Specify a size! The default is 'base'. (doll, shimmy, base, deka)]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Specify a size! The default is 'base'. (doll, shimmy, base, deka)]"),
                                 )
                                 .await
                                 .unwrap();
@@ -1707,9 +1708,9 @@ pub async fn twitch_loop(
                         let size = clean_args[1].to_lowercase();
                         if !valid_sizes.contains(&size) {
                             client
-                                .reply_to_privmsg(
-                                    String::from("[Invalid size! Specify a size, the default is 'base'. (doll, shimmy, base, deka)]"),
+                                .say_in_reply_to(
                                     &msg,
+                                    String::from("[Invalid size! Specify a size, the default is 'base'. (doll, shimmy, base, deka)]"),
                                 )
                                 .await
                                 .unwrap();
@@ -1743,12 +1744,12 @@ pub async fn twitch_loop(
                     "hat" => {
                         if clean_args.len() < 2 {
                             client
-                                .reply_to_privmsg(
+                                .say_in_reply_to(
+                                    &msg,
                                     format!(
                                         "[Specify a hat, or use !removehat. (Valid hats: {})]",
                                         bot_config.valid_hat_types
                                     ),
-                                    &msg,
                                 )
                                 .await
                                 .unwrap();
@@ -1782,12 +1783,12 @@ pub async fn twitch_loop(
                             }
                         } else {
                             client
-                                .reply_to_privmsg(
+                                .say_in_reply_to(
+                                    &msg,
                                     format!(
                                         "[{} is not a valid hat! (Valid hats: {})]",
                                         &requested_hat_type, bot_config.valid_hat_types
                                     ),
-                                    &msg,
                                 )
                                 .await
                                 .unwrap();
@@ -1835,17 +1836,17 @@ pub async fn twitch_loop(
                             message = "[You do not have permissions to run this!]";
                         }
                         client
-                            .reply_to_privmsg(message.to_string(), &msg)
+                            .say_in_reply_to(&msg, message.to_string())
                             .await
                             .unwrap();
                     }
                     _ => {
                         client
-                            .reply_to_privmsg(
+                            .say_in_reply_to(
+                                &msg,
                                 String::from(
                                     "[Not a valid command! Type !help for a list of commands.]",
                                 ),
-                                &msg,
                             )
                             .await
                             .unwrap();
@@ -1990,10 +1991,7 @@ pub struct GameInstance {
 const UNKNOWN_SERVER_ID: &str = "UNKNOWN";
 
 pub async fn get_instances(game_id: i64) -> Result<Option<Vec<GameInstance>>, Box<dyn Error>> {
-    let api_url: String = format!(
-        "https://games.roblox.com/v1/games/{game_id}/servers/Public",
-        game_id = game_id
-    );
+    let api_url: String = format!("https://games.roblox.com/v1/games/{game_id}/servers/Public");
     let response = reqwest::get(api_url).await?;
 
     if !(&response.status().is_success()) {
@@ -2233,10 +2231,7 @@ async fn server_check_logic(
         InstructionPair {
             execution_order: 1,
             instruction: Instruction::SystemChatMessage {
-                message: format!(
-                    "[Moving servers! There is a server with {} more players. See you there!]",
-                    difference
-                ),
+                message: format!("[Moving servers! There is a server with {difference} more players. See you there!]"),
             },
         },
         InstructionPair {
@@ -2720,10 +2715,7 @@ pub async fn hud_ws_server(hud_sender: UnboundedSender<HUDInstruction>) {
                 }
             }
             simple_websockets::Event::Message(client_id, message) => {
-                println!(
-                    "[HUD] Received a message from client #{}: {:?}",
-                    client_id, message
-                );
+                println!("[HUD] Received a message from client #{client_id}: {message:?}");
                 let hud_message_instruction = match message {
                     simple_websockets::Message::Text(text) => {
                         HUDInstruction::ClientMessage { message: text }
@@ -2785,9 +2777,9 @@ pub async fn main() {
     );
 }
 
-//===========
-//[Test Main]
-//===========
+// //===========
+// //[Test Main]
+// //===========
 // #[tokio::main]
 // pub async fn main() {
 //     dotenv::from_filename("..\\.env").ok();
@@ -2802,31 +2794,6 @@ pub async fn main() {
 //         UnboundedSender<SystemInstruction>,
 //         UnboundedReceiver<SystemInstruction>,
 //     ) = unbounded_channel();
-
-//     // let twitch_task = twitch_loop(queue_sender.clone(), hud_sender.clone(), bot_config.clone());
-//     // let anti_afk_task = anti_afk_loop(queue_sender.clone(), bot_config.clone());
-//     let queue_processor_task =
-//         queue_processor(queue_receiver, hud_sender.clone(), bot_config.clone());
-//     // let server_check_task = server_check_loop(queue_sender.clone(), bot_config.clone());
-//     let clock_tick_task =
-//         clock_tick_loop(queue_sender.clone(), hud_sender.clone(), bot_config.clone());
-//     let hud_loop_task = hud_loop(hud_receiver);
-//     let hud_ws_server_task = hud_ws_server(hud_sender.clone());
-
-//     // check_active(&bot_config.game_name.clone());
-
-//     let (
-//         _r1,
-//         _r2,
-//         _r3,
-//         _r4, // , _r5, _r6, _r7
-//     ) = tokio::join!(
-//         // twitch_task,
-//         // anti_afk_task,
-//         queue_processor_task,
-//         // server_check_task,
-//         clock_tick_task,
-//         hud_loop_task,
-//         hud_ws_server_task
-//     );
+//     check_active(&bot_config.game_name);
+//     //leap(1.0, 1.0, 'w');
 // }
