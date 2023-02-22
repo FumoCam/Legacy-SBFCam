@@ -137,7 +137,7 @@ fn navbar_sit() {
     thread::sleep(DELAY);
     mouse_click(&mut enigo);
     thread::sleep(DELAY);
-    //mouse_hide(&mut enigo);
+    mouse_hide(&mut enigo);
 }
 
 fn mouse_move(enigo: &mut Enigo, x_ratio: f32, y_ratio: f32) {
@@ -616,54 +616,61 @@ pub async fn queue_processor(
 
 #[must_use]
 pub fn get_warp_locations() -> (HashMap<String, String>, String) {
-    // TODO: Make this less awful
-    let mut tp_locations = HashMap::new();
-    tp_locations.insert(String::from("big"), String::from("Big Island"));
-    tp_locations.insert(String::from("build"), String::from("i forgot how to build"));
-    tp_locations.insert(String::from("fountain"), String::from("Fountain"));
-    tp_locations.insert(String::from("fumofas"), String::from("Fumofas Park"));
-    tp_locations.insert(String::from("minesweeper"), String::from("Minesweeper"));
-    tp_locations.insert(String::from("pof"), String::from("plates of fate v1.5"));
-    tp_locations.insert(String::from("poolside"), String::from("Poolside"));
-    tp_locations.insert(
-        String::from("radio"),
-        String::from("Radio Rock + Raging Demon Raceway"),
+    // TODO: Read from json or make this less awful
+    let tp_locations_hashmap = HashMap::from_iter(
+        [
+            ("beach", "Beach"),
+            ("beachhouse", "Beach House"),
+            ("big", "Big Island"),
+            ("bowling", "Bowling"),
+            ("build", "i forgot how to build"),
+            ("cave", "Cave"),
+            ("devil", "Scarlet Devil Mansion"),
+            ("fire", "Fireside Island"),
+            ("fountain", "Fountain"),
+            ("fumofas", "Fumofas Park"),
+            ("highway", "Highway"),
+            ("ice", "Ice Town"),
+            ("minesweeper", "Minesweeper"),
+            ("pof", "plates of fate v1.5"),
+            ("poolside", "Poolside"),
+            ("radio", "Radio Rock + Raging Demon Raceway"),
+            ("ruins", "Ruins"),
+            ("sewers", "Rat Sewers"),
+            ("shrimp", "Shreimp Mart"),
+            ("sky", "Floating Island"),
+        ]
+        .map(|(a, b)| (String::from(a), String::from(b))),
     );
-    tp_locations.insert(String::from("ruins"), String::from("Ruins"));
-    tp_locations.insert(String::from("shrimp"), String::from("Shreimp Mart"));
-    tp_locations.insert(String::from("sky"), String::from("Floating Island"));
-    tp_locations.insert(String::from("fire"), String::from("Fireside Island"));
-    tp_locations.insert(String::from("beach"), String::from("Beach"));
-    tp_locations.insert(String::from("beachhouse"), String::from("Beach House"));
-    tp_locations.insert(String::from("devil"), String::from("Scarlet Devil Mansion"));
-    tp_locations.insert(String::from("highway"), String::from("Highway"));
-    tp_locations.insert(String::from("sewers"), String::from("Rat Sewers"));
-    tp_locations.insert(String::from("bowling"), String::from("Bowling"));
-    tp_locations.insert(String::from("cave"), String::from("Cave"));
-    tp_locations.insert(String::from("ice"), String::from("Ice Town"));
 
-    let valid_tp_locations = tp_locations
+    // Create ordered, comma-seperated string from key-value hashmap
+    let mut valid_tp_locations_list = tp_locations_hashmap
         .keys()
         .map(|s| &**s)
-        .collect::<Vec<_>>()
-        .join(", ");
+        .collect::<Vec<_>>();
 
-    (tp_locations, valid_tp_locations)
+    // Sort alphabetically, ignoring case
+    valid_tp_locations_list.sort_by_key(|key| key.to_lowercase());
+    let valid_tp_locations_str = valid_tp_locations_list.join(", ");
+
+    (tp_locations_hashmap, valid_tp_locations_str)
 }
 
 #[must_use]
 pub fn get_hat_types() -> (HashMap<String, String>, String) {
-    // TODO: Make this less awful
-    let hat_types = HashMap::from_iter(
+    // TODO: Read from json or make this less awful
+    let hat_types_hashmap = HashMap::from_iter(
         [
             ("none", "none"),
             ("bird", "bird"),
+            ("box", "MangosBox"),
+            ("chito", "Chito1"),
             ("doremy", "DoremyHatOMGG"),
             ("fire1", "Diable Jambe V1"),
             ("fire2", "Diable Jambe V2"),
             ("glasses1", "Keine"),
             ("glasses2", "gagglasses"),
-            ("glasses3", "KaminaGlasses"),
+            ("guitar", "GuitarBag"),
             ("hanyuu", "hanyuuhat"),
             ("koishi", "KOISHIIIIIIII"),
             ("marisa1", "MarisaHat"),
@@ -678,19 +685,22 @@ pub fn get_hat_types() -> (HashMap<String, String>, String) {
             ("niko", "NikoHat"),
             ("pancake", "pancak"),
             ("scythe", "ellyscythe"),
+            ("sunglasses1", "KaminaGlasses"),
+            ("sunglasses2", "Hola"),
             ("strawberry", "Strawberry"),
             ("youmu", "youmumyonandswords"),
+            ("yuuri", "Yuuri1"),
         ]
         .map(|(a, b)| (String::from(a), String::from(b))),
     );
 
-    let valid_hats = hat_types
-        .keys()
-        .map(|s| &**s)
-        .collect::<Vec<_>>()
-        .join(", ");
+    // Create ordered, comma-seperated string from key-value hashmap
+    let mut valid_hats_list = hat_types_hashmap.keys().map(|s| &**s).collect::<Vec<_>>();
+    // Sort alphabetically, ignoring case
+    valid_hats_list.sort_by_key(|key| key.to_lowercase());
+    let valid_hats_str = valid_hats_list.join(", ");
 
-    (hat_types, valid_hats)
+    (hat_types_hashmap, valid_hats_str)
 }
 
 #[allow(non_snake_case)]
@@ -1091,10 +1101,13 @@ pub async fn twitch_loop(
                     "warp" => {
                         if clean_args.len() < 2 {
                             client
+                                .say_in_reply_to(&msg, String::from("[Specify a location!]"))
+                                .await
+                                .unwrap();
+                            client
                                 .say_in_reply_to(
                                     &msg,
-                                    format!("[Specify a location! Map: https://sbf.fumocam.xyz/warp-map (Valid locations: {})]", bot_config.valid_tp_locations),
-                                    
+                                    format!("({})", bot_config.valid_tp_locations),
                                 )
                                 .await
                                 .unwrap();
@@ -1141,7 +1154,20 @@ pub async fn twitch_loop(
                                 eprintln!("Warp Channel Error");
                             }
                         } else {
-                            client.say_in_reply_to(&msg, format!("[{} is not a valid location! Map: https://sbf.fumocam.xyz/warp-map (Valid locations: {})]", clean_args[1], bot_config.valid_tp_locations)).await.unwrap();
+                            client
+                                .say_in_reply_to(
+                                    &msg,
+                                    format!("[{} is not a valid location!]", clean_args[1]),
+                                )
+                                .await
+                                .unwrap();
+                            client
+                                .say_in_reply_to(
+                                    &msg,
+                                    format!("({})", bot_config.valid_tp_locations),
+                                )
+                                .await
+                                .unwrap();
                         }
                     }
                     "left" => {
@@ -1746,11 +1772,12 @@ pub async fn twitch_loop(
                             client
                                 .say_in_reply_to(
                                     &msg,
-                                    format!(
-                                        "[Specify a hat, or use !removehat. (Valid hats: {})]",
-                                        bot_config.valid_hat_types
-                                    ),
+                                    String::from("[Specify a hat, or use !removehat]."),
                                 )
+                                .await
+                                .unwrap();
+                            client
+                                .say_in_reply_to(&msg, format!("({})", bot_config.valid_hat_types))
                                 .await
                                 .unwrap();
                             continue;
@@ -1785,11 +1812,12 @@ pub async fn twitch_loop(
                             client
                                 .say_in_reply_to(
                                     &msg,
-                                    format!(
-                                        "[{} is not a valid hat! (Valid hats: {})]",
-                                        &requested_hat_type, bot_config.valid_hat_types
-                                    ),
+                                    format!("[{} is not a valid hat!]", &requested_hat_type),
                                 )
+                                .await
+                                .unwrap();
+                            client
+                                .say_in_reply_to(&msg, format!("({})", bot_config.valid_hat_types))
                                 .await
                                 .unwrap();
                         }
