@@ -1,0 +1,51 @@
+on: push
+
+name: Rust CI
+
+jobs:
+  rust-ci:
+    runs-on: windows-2022
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v3.3.0
+        name: "Pull code"
+
+      - uses: actions-rs/toolchain@v1.0.6
+        name: "Initalize Rust Toolchain"
+        with:
+          profile: minimal
+          toolchain: stable
+          target: x86_64-pc-windows-msvc
+          override: true
+          components: rustfmt, clippy
+
+      # TODO: Cache cargo dependency installs
+
+      # Formatting
+      - uses: actions-rs/cargo@v1.0.1
+        name: "Format"
+        with:
+          command: fmt
+          args: --manifest-path rust/Cargo.toml --all --check
+
+      # Linting
+      - uses: actions-rs/cargo@v1.0.1
+        name: "Lint"
+        with:
+          command: clippy
+          args: --manifest-path rust/Cargo.toml -- -D warnings --no-deps # FIXME: Known issue, clippy still checks dependencies in github action
+
+      # Building
+      - uses: actions-rs/cargo@v1.0.1
+        name: "Build"
+        with:
+          command: check
+          args: --manifest-path rust/Cargo.toml --release
+#      # Testing
+#      - uses: actions-rs/cargo@v1.01
+#        name: "Test"
+#        with:
+#          command: test
+#          args: --manifest-path rust/Cargo.toml

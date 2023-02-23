@@ -2,8 +2,7 @@
 name = "sbf_cam"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+rust-version = "1.67.1"
 
 [dependencies]
 dotenv = "0.15.0"
