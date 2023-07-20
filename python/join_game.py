@@ -138,15 +138,22 @@ def main():
     )
     args = parser.parse_args()
 
+    driver = args.driver
+    if args.driver == "SEARCH": # HACK: make better
+        found_drivers = [x for x in SELENIUM_PATH.glob("chromedriver*.exe") if x.is_file()]
+        if len(found_drivers) > 0:
+            driver = found_drivers[0].resolve()
+            print(driver)
     if args.mode == "launch":
         if not args.game:
             raise ValueError("Expected value for arg 'game'.")
         if not args.instance:
             raise ValueError("Expected value for arg 'instance'.")
 
-        launch_roblox(args.game, args.instance, args.driver)
+        launch_roblox(args.game, args.instance, driver)
     elif args.mode == "cookies":
-        save_cookies(args.driver)
+        
+        save_cookies(driver)
     else:
         raise ValueError(
             f"Invalid option '{args.mode}'. Valid options are [{','.join(VALID_MODES)}]."
