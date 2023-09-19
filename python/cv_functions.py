@@ -34,7 +34,7 @@ def detect_pixels(
     if debug:
         from time import sleep
 
-        sleep(2)
+        sleep(5)
 
     screenshot = get_screenshot(capture_region)
     pixels_np = np.array(detect_value + [255])
@@ -138,6 +138,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # poetry run python .\cv_functions.py --func detect_pixels --left 690 --top 669 --width 10 --height 5 --detect_value 173,173,173 --debug true
-    # poetry run python .\cv_functions.py --func detect_pixels --left 690 --top 669 --width 10 --height 5 --detect_value 246,246,246 --debug true
+    # poetry run python .\cv_functions.py --func detect_pixels --left 575 --top 680 --width 10 --height 5 --detect_value 179,179,179 --debug true
+    # poetry run python .\cv_functions.py --func detect_pixels --left 575 --top 680 --width 10 --height 5 --detect_value 255,255,255 --debug true
     main()

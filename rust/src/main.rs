@@ -2568,7 +2568,7 @@ fn cv_get_backpack_hover(window_title: &str) -> bool {
     thread::sleep(DELAY);
     mouse_move(&mut enigo, 0.47, 0.95);
     println!("cv_get_backpack_hover");
-    get_pixel(691, 669, 9, 5, 179, 179, 179)
+    get_pixel(575, 680, 10, 5, 179, 179, 179)
 }
 fn cv_get_navbar(window_title: &str) -> bool {
     check_active(window_title);
@@ -2578,7 +2578,7 @@ fn cv_get_navbar(window_title: &str) -> bool {
     thread::sleep(DELAY);
     mouse_move(&mut enigo, 0.47, 0.99);
     println!("cv_get_navbar");
-    get_pixel(691, 669, 9, 5, 255, 255, 255)
+    get_pixel(575, 680, 10, 5, 255, 255, 255)
 }
 fn cv_get_navbar_hidden(window_title: &str) -> bool {
     check_active(window_title);
@@ -2588,7 +2588,7 @@ fn cv_get_navbar_hidden(window_title: &str) -> bool {
     thread::sleep(DELAY);
     mouse_hide(&mut enigo);
     println!("cv_get_navbar_hidden");
-    !(get_pixel(691, 669, 9, 5, 255, 255, 255))
+    !(get_pixel(575, 680, 10, 5, 255, 255, 255))
 }
 
 fn cv_check_loaded_in(window_title: &str) -> bool {
