@@ -662,6 +662,7 @@ pub fn get_hat_types() -> (HashMap<String, String>, String) {
     let hat_types_hashmap = HashMap::from_iter(
         [
             ("none", "none"),
+            ("bee", "BeeWriggle"),
             ("bird", "bird"),
             ("box", "MangosBox"),
             ("chito", "Chito1"),
