@@ -18,6 +18,8 @@ use std::env;
 use std::error::Error;
 use std::process::Command;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::RwLock;
 use std::thread;
 use std::time::Duration;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -260,20 +262,33 @@ async fn discord_log(
     let _resp = client.post(webhook_url).json(&webhook_data).send().await?;
     Ok(())
 }
-async fn notify_admin(
+async fn _send_admin_log(
     message: &str,
+    do_ping: bool,
 ) -> std::result::Result<(), Box<dyn std::error::Error + Sync + Send>> {
     let webhook_url =
         env::var("DISCORD_ALERT_WEBHOOK_URL").expect("$DISCORD_ALERT_WEBHOOK_URL is not set");
     let author_discord_id = env::var("AUTHOR_DISCORD_ID").expect("$AUTHOR_DISCORD_ID is not set");
     let mut webhook_data = HashMap::new();
-    webhook_data.insert(
-        "content",
-        format!("<@{author_discord_id}>\n{message}\n<https://twitch.tv/sbfcam>"),
-    );
+    let base_msg = format!("{message}\n<https://twitch.tv/sbfcam>");
+    let mut content = base_msg.clone();
+    if do_ping {
+        content = format!("{base_msg}\n<@{author_discord_id}>");
+    }
+    webhook_data.insert("content", content);
     let client = reqwest::Client::new();
     let _resp = client.post(webhook_url).json(&webhook_data).send().await?;
     Ok(())
+}
+async fn notify_admin(
+    message: &str,
+) -> std::result::Result<(), Box<dyn std::error::Error + Sync + Send>> {
+    _send_admin_log(message, true).await
+}
+async fn log_admin(
+    message: &str,
+) -> std::result::Result<(), Box<dyn std::error::Error + Sync + Send>> {
+    _send_admin_log(message, false).await
 }
 fn check_active(window_title: &str) -> bool {
     if get_active_window() != window_title {
@@ -2233,6 +2248,7 @@ async fn force_rejoin(
 async fn server_check_logic(
     queue_sender: UnboundedSender<SystemInstruction>,
     bot_config: BotConfig,
+    bot_state: BotState,
     instance_list: Vec<GameInstance>,
 ) {
     let in_server = check_in_server(&bot_config.player_token, instance_list.clone());
@@ -2297,14 +2313,34 @@ async fn server_check_logic(
             },
         },
     ];
-    if !(in_server) {
-        // Crash likely
-        println!("Potential crash detected");
 
-        let is_active = check_active(&bot_config.game_name.clone());
-        let exe_status = if is_active { "Running" } else { "Not found" };
-        let message = format!("Likely crash detected | {exe_status}");
-        notify_admin(&message).await.ok();
+    // Get BotState value and release lock immediately
+    let is_initial_boot = {
+        let state = bot_state.read().unwrap();
+        state.initial_boot
+    };
+
+    // Restart/Crash
+    if !(in_server) {
+        let mut rejoin_mesage = "[Crash recovery complete! Ready to accept commands.]";
+        if is_initial_boot {
+            //Restart
+            println!("Restart detected");
+            rejoin_mesage = "[Restart complete! Ready to accept commands.]";
+            {
+                // Write to app state and release lock
+                let mut state = bot_state.write().unwrap();
+                state.initial_boot = false;
+            }
+            log_admin("Restart detected").await.ok();
+        } else {
+            // Crash
+            println!("Potential crash detected");
+            let is_active = check_active(&bot_config.game_name.clone());
+            let exe_status = if is_active { "Running" } else { "Not found" };
+            let message = format!("Likely crash detected | {exe_status}");
+            notify_admin(&message).await.ok();
+        }
 
         instructions = vec![
             InstructionPair {
@@ -2333,7 +2369,7 @@ async fn server_check_logic(
             InstructionPair {
                 execution_order: 4,
                 instruction: Instruction::SystemChatMessage {
-                    message: "[Crash recovery complete! Ready to accept commands.]".to_string(),
+                    message: rejoin_mesage.to_string(),
                 },
             },
         ];
@@ -2352,6 +2388,7 @@ async fn server_check_logic(
 async fn server_check_loop(
     queue_sender: UnboundedSender<SystemInstruction>,
     bot_config: BotConfig,
+    bot_state: BotState,
 ) {
     let interval_minutes = 3;
     let mut interval = tokio::time::interval(Duration::from_millis(interval_minutes * 60 * 1000));
@@ -2368,6 +2405,7 @@ async fn server_check_loop(
                         server_check_logic(
                             queue_sender.clone(),
                             bot_config.clone(),
+                            bot_state.clone(),
                             instance_list.clone(),
                         )
                         .await;
@@ -2763,6 +2801,14 @@ pub async fn hud_ws_server(hud_sender: UnboundedSender<HUDInstruction>) {
     }
 }
 // END HUD STUFF
+pub struct BotStateModel {
+    initial_boot: bool,
+}
+type BotState = Arc<RwLock<BotStateModel>>;
+#[must_use]
+pub fn init_state() -> BotState {
+    Arc::new(RwLock::new(BotStateModel { initial_boot: true }))
+}
 
 // =================
 // [Production Main]
@@ -2773,6 +2819,7 @@ pub async fn main() {
     dotenv::from_filename("..\\.env").ok();
 
     let bot_config = init_config();
+    let bot_state = init_state();
 
     let (hud_sender, hud_receiver): (
         UnboundedSender<HUDInstruction>,
@@ -2787,7 +2834,8 @@ pub async fn main() {
     let anti_afk_task = anti_afk_loop(queue_sender.clone(), bot_config.clone());
     let queue_processor_task =
         queue_processor(queue_receiver, hud_sender.clone(), bot_config.clone());
-    let server_check_task = server_check_loop(queue_sender.clone(), bot_config.clone());
+    let server_check_task =
+        server_check_loop(queue_sender.clone(), bot_config.clone(), bot_state.clone());
     let clock_tick_task =
         clock_tick_loop(queue_sender.clone(), hud_sender.clone(), bot_config.clone());
     let hud_loop_task = hud_loop(hud_receiver);
