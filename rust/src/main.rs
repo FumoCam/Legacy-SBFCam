@@ -2274,6 +2274,12 @@ async fn server_check_logic(
         return;
     }
 
+    let is_initial_boot = {
+        // Get BotState value and release lock immediately
+        let state = bot_state.read().unwrap();
+        state.initial_boot
+    };
+
     let in_server = check_in_server(&bot_config.player_token, instance_list.clone());
     let in_best_server = if in_server {
         check_in_best_server(&bot_config.player_token, instance_list.clone())
@@ -2282,6 +2288,13 @@ async fn server_check_logic(
     };
 
     if in_server && in_best_server {
+        if is_initial_boot {
+            {
+                // Write to app state and release lock
+                let mut state = bot_state.write().unwrap();
+                state.initial_boot = false;
+            }
+        }
         return;
     }
 
@@ -2293,6 +2306,13 @@ async fn server_check_logic(
 
     // Server hop (more people)
     if in_server {
+        if is_initial_boot {
+            {
+                // Write to app state and release lock
+                let mut state = bot_state.write().unwrap();
+                state.initial_boot = false;
+            }
+        }
         {
             // Write to app state and release lock
             let mut state = bot_state.write().unwrap();
@@ -2349,11 +2369,6 @@ async fn server_check_logic(
     }
     // Restart/Crash
     else {
-        let is_initial_boot = {
-            // Get BotState value and release lock immediately
-            let state = bot_state.read().unwrap();
-            state.initial_boot
-        };
         let rejoin_mesage: &str;
 
         if is_initial_boot {
