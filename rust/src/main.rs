@@ -382,6 +382,7 @@ pub enum Instruction {
     HideMouse {},
     JoinServer {
         server_id: String,
+        is_server_hop: bool,
     },
     Grief {},
     Leap {
@@ -449,6 +450,7 @@ pub async fn queue_processor(
     mut channel_receiver: UnboundedReceiver<SystemInstruction>,
     hud_sender: UnboundedSender<HUDInstruction>,
     bot_config: BotConfig,
+    bot_state: BotState,
 ) {
     let mut instruction_history: Vec<InstructionPair> = Vec::new();
 
@@ -610,11 +612,21 @@ pub async fn queue_processor(
                     println!("zoom_camera");
                     camera_zoom(direction, *duration);
                 }
-                Instruction::JoinServer { server_id } => {
+                Instruction::JoinServer {
+                    server_id,
+                    is_server_hop,
+                } => {
                     // Deliberately synchronous/blocking
                     println!("join_game_selenium {}", &server_id);
                     join_game_selenium(bot_config.game_id, server_id);
                     let loaded_in = cv_check_loaded_in(&bot_config.game_name.clone());
+                    if *is_server_hop {
+                        {
+                            // Write to app state and release lock
+                            let mut state = bot_state.write().unwrap();
+                            state.is_server_hopping = false;
+                        }
+                    }
                     println!("Loaded in: {loaded_in}");
                     if !loaded_in {
                         notify_admin("Failed to load in!").await.ok();
@@ -2192,6 +2204,7 @@ fn _force_rejoin(
         execution_order: 4,
         instruction: Instruction::JoinServer {
             server_id: best_server.id,
+            is_server_hop: false,
         },
     });
     instructions.push(InstructionPair {
@@ -2203,7 +2216,7 @@ fn _force_rejoin(
     instructions.push(InstructionPair {
         execution_order: 6,
         instruction: Instruction::SystemChatMessage {
-            message: "[Crash recovery complete! Ready to accept commands.]".to_string(),
+            message: "[Force-Rejoin complete! Ready to accept commands.]".to_string(),
         },
     });
 
@@ -2251,6 +2264,16 @@ async fn server_check_logic(
     bot_state: BotState,
     instance_list: Vec<GameInstance>,
 ) {
+    let is_server_hopping = {
+        // Get BotState value and release lock immediately
+        let state = bot_state.read().unwrap();
+        state.is_server_hopping
+    };
+
+    if is_server_hopping {
+        return;
+    }
+
     let in_server = check_in_server(&bot_config.player_token, instance_list.clone());
     let in_best_server = if in_server {
         check_in_best_server(&bot_config.player_token, instance_list.clone())
@@ -2266,63 +2289,73 @@ async fn server_check_logic(
     let current_server = get_current_server(&bot_config.player_token, instance_list.clone());
     let difference = best_server.players.len() - current_server.players.len();
 
-    let mut instructions = vec![
-        InstructionPair {
-            execution_order: 0,
-            instruction: Instruction::CheckActive {
-                window_title: bot_config.game_name.clone(),
-            },
-        },
-        InstructionPair {
-            execution_order: 1,
-            instruction: Instruction::SystemChatMessage {
-                message: format!("[Moving servers! There is a server with {difference} more players. See you there!]"),
-            },
-        },
-        InstructionPair {
-            execution_order: 2,
-            instruction: Instruction::Wait { amount_ms: 7000 },
-        },
-        InstructionPair {
-            execution_order: 3,
-            instruction: Instruction::TerminateGame {},
-        },
-        InstructionPair {
-            execution_order: 4,
-            instruction: Instruction::WaitWithMessage {
-                amount_ms: 10000,
-                message: String::from("ABIDING ROBLOX RATE-LIMIT"),
-            },
-        },
-        InstructionPair {
-            execution_order: 5,
-            instruction: Instruction::JoinServer {
-                server_id: best_server.id.clone(),
-            },
-        },
-        InstructionPair {
-            execution_order: 6,
-            instruction: Instruction::CheckActive {
-                window_title: bot_config.game_name.clone(),
-            },
-        },
-        InstructionPair {
-            execution_order: 7,
-            instruction: Instruction::SystemChatMessage {
-                message: "[Server relocation complete! Ready to accept commands.]".to_string(),
-            },
-        },
-    ];
+    let instructions: Vec<InstructionPair>;
 
-    // Get BotState value and release lock immediately
-    let is_initial_boot = {
-        let state = bot_state.read().unwrap();
-        state.initial_boot
-    };
-
+    // Server hop (more people)
+    if in_server {
+        {
+            // Write to app state and release lock
+            let mut state = bot_state.write().unwrap();
+            state.is_server_hopping = true;
+        }
+        instructions = vec![
+            InstructionPair {
+                execution_order: 0,
+                instruction: Instruction::CheckActive {
+                    window_title: bot_config.game_name.clone(),
+                },
+            },
+            InstructionPair {
+                execution_order: 1,
+                instruction: Instruction::SystemChatMessage {
+                    message: format!("[Moving servers! There is a server with {difference} more players. See you there!]"),
+                },
+            },
+            InstructionPair {
+                execution_order: 2,
+                instruction: Instruction::Wait { amount_ms: 7000 },
+            },
+            InstructionPair {
+                execution_order: 3,
+                instruction: Instruction::TerminateGame {},
+            },
+            InstructionPair {
+                execution_order: 4,
+                instruction: Instruction::WaitWithMessage {
+                    amount_ms: 10000,
+                    message: String::from("ABIDING ROBLOX RATE-LIMIT"),
+                },
+            },
+            InstructionPair {
+                execution_order: 5,
+                instruction: Instruction::JoinServer {
+                    server_id: best_server.id.clone(),
+                    is_server_hop: true
+                },
+            },
+            InstructionPair {
+                execution_order: 6,
+                instruction: Instruction::CheckActive {
+                    window_title: bot_config.game_name.clone(),
+                },
+            },
+            InstructionPair {
+                execution_order: 7,
+                instruction: Instruction::SystemChatMessage {
+                    message: "[Server relocation complete! Ready to accept commands.]".to_string(),
+                },
+            },
+        ];
+    }
     // Restart/Crash
-    if !(in_server) {
-        let mut rejoin_mesage = "[Crash recovery complete! Ready to accept commands.]";
+    else {
+        let is_initial_boot = {
+            // Get BotState value and release lock immediately
+            let state = bot_state.read().unwrap();
+            state.initial_boot
+        };
+        let rejoin_mesage: &str;
+
         if is_initial_boot {
             //Restart
             println!("Restart detected");
@@ -2336,6 +2369,7 @@ async fn server_check_logic(
         } else {
             // Crash
             println!("Potential crash detected");
+            rejoin_mesage = "[Crash recovery complete! Ready to accept commands.]";
             let is_active = check_active(&bot_config.game_name.clone());
             let exe_status = if is_active { "Running" } else { "Not found" };
             let message = format!("Likely crash detected | {exe_status}");
@@ -2358,6 +2392,7 @@ async fn server_check_logic(
                 execution_order: 2,
                 instruction: Instruction::JoinServer {
                     server_id: best_server.id.clone(),
+                    is_server_hop: false,
                 },
             },
             InstructionPair {
@@ -2803,11 +2838,15 @@ pub async fn hud_ws_server(hud_sender: UnboundedSender<HUDInstruction>) {
 // END HUD STUFF
 pub struct BotStateModel {
     initial_boot: bool,
+    is_server_hopping: bool,
 }
 type BotState = Arc<RwLock<BotStateModel>>;
 #[must_use]
 pub fn init_state() -> BotState {
-    Arc::new(RwLock::new(BotStateModel { initial_boot: true }))
+    Arc::new(RwLock::new(BotStateModel {
+        initial_boot: true,
+        is_server_hopping: false,
+    }))
 }
 
 // =================
@@ -2832,8 +2871,12 @@ pub async fn main() {
 
     let twitch_task = twitch_loop(queue_sender.clone(), hud_sender.clone(), bot_config.clone());
     let anti_afk_task = anti_afk_loop(queue_sender.clone(), bot_config.clone());
-    let queue_processor_task =
-        queue_processor(queue_receiver, hud_sender.clone(), bot_config.clone());
+    let queue_processor_task = queue_processor(
+        queue_receiver,
+        hud_sender.clone(),
+        bot_config.clone(),
+        bot_state.clone(),
+    );
     let server_check_task =
         server_check_loop(queue_sender.clone(), bot_config.clone(), bot_state.clone());
     let clock_tick_task =
