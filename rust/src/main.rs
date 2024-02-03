@@ -628,7 +628,9 @@ pub async fn queue_processor(
                         }
                     }
                     println!("Loaded in: {loaded_in}");
-                    if !loaded_in {
+                    if loaded_in {
+                        hotfix_close_motd(&bot_config.game_name);
+                    } else {
                         notify_admin("Failed to load in!").await.ok();
                     }
                 }
@@ -2679,6 +2681,18 @@ fn cv_get_navbar_hidden(window_title: &str) -> bool {
     !(get_pixel(575, 680, 10, 5, 255, 255, 255))
 }
 
+fn hotfix_close_motd(window_title: &str) {
+    check_active(window_title);
+    const DELAY: Duration = Duration::from_millis(500);
+    let mut enigo = Enigo::new();
+    mouse_move(&mut enigo, 0.2, 0.78);
+    thread::sleep(DELAY);
+    mouse_move(&mut enigo, 0.2, 0.78);
+    mouse_click(&mut enigo);
+    thread::sleep(DELAY * 2);
+    mouse_click(&mut enigo);
+    println!("hotfix_close_motd");
+}
 fn cv_check_loaded_in(window_title: &str) -> bool {
     let max_seconds = 120;
     let delay_seconds = 2;
