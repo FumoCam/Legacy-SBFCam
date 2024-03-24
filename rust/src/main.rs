@@ -221,15 +221,44 @@ fn open_console_chat() {
     mouse_hide(&mut enigo);
 }
 
-fn run_console_command(command: &str) {
-    open_console_chat();
+fn toggle_console_mouse(window_title: &str) {
+    check_active(window_title);
+    const DELAY: Duration = Duration::from_millis(500);
+    let mut enigo = Enigo::new();
+    mouse_move(&mut enigo, 0.875, 0.03);
+    thread::sleep(DELAY);
+    mouse_move(&mut enigo, 0.875, 0.03);
+    thread::sleep(DELAY);
+    mouse_click(&mut enigo);
+    println!("hotfix_close_console");
+}
+
+fn click_console_input() {
+    const DELAY: Duration = Duration::from_millis(500);
+    let mut enigo = Enigo::new();
+    mouse_move(&mut enigo, 0.5, 0.23);
+    thread::sleep(DELAY);
+    mouse_move(&mut enigo, 0.5, 0.23);
+    thread::sleep(DELAY);
+    mouse_click(&mut enigo);
+    println!("hotfix_console_clicked");
+}
+
+fn run_console_command(window_title: &str, command: &str) {
+    check_active(window_title);
+    toggle_console_mouse(window_title);
+    thread::sleep(Duration::from_millis(750));
+    click_console_input();
     let mut enigo = Enigo::new();
     thread::sleep(Duration::from_millis(750));
     enigo.key_sequence(command);
     thread::sleep(Duration::from_millis(750));
     enigo.key_click(Key::Return);
+    // Needs double click?
     thread::sleep(Duration::from_millis(750));
-    enigo.key_click(Key::Escape);
+    toggle_console_mouse(window_title);
+    thread::sleep(Duration::from_millis(750));
+    toggle_console_mouse(window_title);
 }
 
 async fn discord_log(
@@ -506,7 +535,7 @@ pub async fn queue_processor(
                         instruction_history.clear(); // Reset instruction history per-warp
                     }
                     instruction_history.push(history_entry); // Record even if system-requested
-                    run_console_command(command);
+                    run_console_command(&bot_config.game_name, command);
                 }
                 Instruction::HideMouse {} => {
                     println!("hide_mouse");
@@ -2696,6 +2725,7 @@ fn hotfix_close_motd(window_title: &str) {
     mouse_click(&mut enigo);
     println!("hotfix_close_motd");
 }
+
 fn cv_check_loaded_in(window_title: &str) -> bool {
     let max_seconds = 120;
     let delay_seconds = 2;
@@ -2891,6 +2921,9 @@ pub async fn main() {
 
     let bot_config = init_config();
     let bot_state = init_state();
+    //check_active(&bot_config.game_name);
+    // click_console_input();
+    //run_console_command(&bot_config.game_name, "test");
 
     let (hud_sender, hud_receiver): (
         UnboundedSender<HUDInstruction>,
