@@ -246,7 +246,8 @@ fn click_console_input() {
 
 fn run_console_command(window_title: &str, command: &str) {
     check_active(window_title);
-    toggle_console_mouse(window_title);
+    open_console_chat();
+    // toggle_console_mouse(window_title);
     thread::sleep(Duration::from_millis(750));
     click_console_input();
     let mut enigo = Enigo::new();
@@ -661,6 +662,8 @@ pub async fn queue_processor(
                     println!("Loaded in: {loaded_in}");
                     if loaded_in {
                         hotfix_close_motd(&bot_config.game_name);
+                        open_console_chat();
+                        toggle_console_mouse(&bot_config.game_name);
                     } else {
                         notify_admin("Failed to load in!").await.ok();
                     }
