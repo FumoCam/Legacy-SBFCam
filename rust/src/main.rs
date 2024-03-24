@@ -228,6 +228,8 @@ fn run_console_command(command: &str) {
     enigo.key_sequence(command);
     thread::sleep(Duration::from_millis(750));
     enigo.key_click(Key::Return);
+    thread::sleep(Duration::from_millis(750));
+    enigo.key_click(Key::Escape);
 }
 
 async fn discord_log(
