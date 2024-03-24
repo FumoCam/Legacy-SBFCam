@@ -670,6 +670,7 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
             ("sewers", "Rat Sewers"),
             ("shrimp", "Shreimp Mart"),
             ("sky", "Floating Island"),
+            ("somewhere", "somewhere"),
         ]
         .map(|(a, b)| (String::from(a), String::from(b))),
     );
