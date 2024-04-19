@@ -186,25 +186,27 @@ fn send_system_chat(msg: &str) {
 fn send_user_chat(author: &str, msg: &str) {
     let mut enigo = Enigo::new();
 
-    let suffixed_author = format!("{author} "); // Space suffix, to avoid cutoff
+    // TODO: Undo, temp fix to combat spam safeguards
+    // let suffixed_author = format!("{author} "); // Space suffix, to avoid cutoff
     let suffixed_msg = format!("{msg} "); // Space suffix, to avoid cutoff
+    let total_msg = format!("{author} {suffixed_msg}");
     let type_delay = Duration::from_millis(400);
     let send_delay = Duration::from_millis(150);
-    let author_delay = Duration::from_millis(500);
+    // let author_delay = Duration::from_millis(500);
 
-    // Author
-    enigo.key_click(Key::Layout('/'));
-    thread::sleep(type_delay);
-    enigo.key_sequence(&suffixed_author);
-    thread::sleep(send_delay);
-    enigo.key_click(Key::Return);
+    // // Author
+    // enigo.key_click(Key::Layout('/'));
+    // thread::sleep(type_delay);
+    // enigo.key_sequence(&suffixed_author);
+    // thread::sleep(send_delay);
+    // enigo.key_click(Key::Return);
 
-    thread::sleep(author_delay);
+    // thread::sleep(author_delay);
 
     // Message
     enigo.key_click(Key::Layout('/'));
     thread::sleep(type_delay);
-    enigo.key_sequence(&suffixed_msg);
+    enigo.key_sequence(&total_msg);
     thread::sleep(send_delay);
     enigo.key_click(Key::Return);
 }
