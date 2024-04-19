@@ -971,42 +971,77 @@ pub async fn twitch_loop(
                                     continue;
                                 }
                             }
+                            let mut message_lock = false;
                             for bot_message in &chat_result.bot_reply_message {
+                                if bot_message.contains("Spam detected") {
+                                    message_lock = true;
+                                }
                                 println!("Replying: '{bot_message}'");
                                 client
                                     .say_in_reply_to(&msg, bot_message.clone())
                                     .await
                                     .unwrap();
                             }
-
-                            if !chat_result.send_users_message {
-                                continue;
-                            }
-                            let censored_username: String = format!("{}:", chat_result.username);
-                            let censored_message: String = chat_result.message.to_string();
-                            println!("{censored_username}: {censored_message}");
-
-                            let chat_command_instructions = SystemInstruction {
-                                client: Some(client.clone()),
-                                chat_message: Some(msg.clone()),
-                                instructions: vec![
-                                    InstructionPair {
-                                        execution_order: 0,
-                                        instruction: Instruction::CheckActive {
-                                            window_title: bot_config.game_name.clone(),
+                            if message_lock {
+                                if chat_result.message.is_empty() {
+                                    // Already let users ingame know about lock, just twitch msg above and cancel
+                                    continue;
+                                }
+                                // TODO: better code, this is needless rewriting
+                                let chat_command_instructions = SystemInstruction {
+                                    client: Some(client.clone()),
+                                    chat_message: Some(msg.clone()),
+                                    instructions: vec![
+                                        InstructionPair {
+                                            execution_order: 0,
+                                            instruction: Instruction::CheckActive {
+                                                window_title: bot_config.game_name.clone(),
+                                            },
                                         },
-                                    },
-                                    InstructionPair {
-                                        execution_order: 1,
-                                        instruction: Instruction::UserChatMessage {
-                                            message: censored_message,
-                                            author: censored_username,
+                                        InstructionPair {
+                                            execution_order: 1,
+                                            instruction: Instruction::SystemChatMessage {
+                                                message: chat_result.message.to_string(),
+                                            },
                                         },
-                                    },
-                                ],
-                            };
-                            if let Err(_e) = queue_sender.send(chat_command_instructions) {
-                                eprintln!("User Chat Channel Error");
+                                    ],
+                                };
+                                if let Err(_e) = queue_sender.send(chat_command_instructions) {
+                                    eprintln!("User Chat Channel Error");
+                                }
+                            } else {
+                                // Standard message, no messagelock
+                                // TODO: cleaner code in tandem with above
+                                if !chat_result.send_users_message {
+                                    continue;
+                                }
+                                let censored_username: String =
+                                    format!("{}:", chat_result.username);
+                                let censored_message: String = chat_result.message.to_string();
+                                println!("{censored_username}: {censored_message}");
+
+                                let chat_command_instructions = SystemInstruction {
+                                    client: Some(client.clone()),
+                                    chat_message: Some(msg.clone()),
+                                    instructions: vec![
+                                        InstructionPair {
+                                            execution_order: 0,
+                                            instruction: Instruction::CheckActive {
+                                                window_title: bot_config.game_name.clone(),
+                                            },
+                                        },
+                                        InstructionPair {
+                                            execution_order: 1,
+                                            instruction: Instruction::UserChatMessage {
+                                                message: censored_message,
+                                                author: censored_username,
+                                            },
+                                        },
+                                    ],
+                                };
+                                if let Err(_e) = queue_sender.send(chat_command_instructions) {
+                                    eprintln!("User Chat Channel Error");
+                                }
                             }
                         }
                     }
