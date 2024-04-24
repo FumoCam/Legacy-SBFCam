@@ -664,7 +664,6 @@ pub async fn queue_processor(
                     println!("Loaded in: {loaded_in}");
                     if loaded_in {
                         hotfix_close_motd(&bot_config.game_name);
-                        open_console_chat();
                         toggle_console_mouse(&bot_config.game_name);
                     } else {
                         notify_admin("Failed to load in!").await.ok();
