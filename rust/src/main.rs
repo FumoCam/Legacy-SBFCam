@@ -257,11 +257,11 @@ fn run_console_command(window_title: &str, command: &str) {
     enigo.key_sequence(command);
     thread::sleep(Duration::from_millis(750));
     enigo.key_click(Key::Return);
+    thread::sleep(Duration::from_millis(750));
+    toggle_console_mouse(window_title);
     // Needs double click?
-    thread::sleep(Duration::from_millis(750));
-    toggle_console_mouse(window_title);
-    thread::sleep(Duration::from_millis(750));
-    toggle_console_mouse(window_title);
+    // thread::sleep(Duration::from_millis(750));
+    // toggle_console_mouse(window_title);
 }
 
 async fn discord_log(
