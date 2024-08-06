@@ -2,7 +2,7 @@
 name = "sbf_cam"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.67.1"
+rust-version = "1.80.0"
 
 [dependencies]
 dotenv = "0.15.0"
