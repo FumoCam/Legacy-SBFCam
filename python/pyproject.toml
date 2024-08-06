@@ -12,7 +12,7 @@ mss = "^6.1.0"
 opencv-python = "^4.6.0"
 
 [tool.poetry.dev-dependencies]
-black = "^22.6.0"
+black = "^24.3.0"
 flake8 = "^5.0.4"
 isort = "^5.10.1"
 types-selenium = "^3.141.9"
