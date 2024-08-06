@@ -1141,7 +1141,7 @@ pub async fn twitch_loop(
                                 .unwrap();
                             continue;
                         }
-                        let valid_directions = vec![
+                        let valid_directions = [
                             String::from("w"),
                             String::from("a"),
                             String::from("s"),
@@ -1827,7 +1827,7 @@ pub async fn twitch_loop(
                                 .unwrap();
                             continue;
                         }
-                        let valid_sizes = vec![
+                        let valid_sizes = [
                             String::from("base"),
                             String::from("shimmy"),
                             String::from("doll"),
