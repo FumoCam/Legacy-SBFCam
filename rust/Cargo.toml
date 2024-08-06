@@ -5,22 +5,22 @@ edition = "2021"
 rust-version = "1.80.0"
 
 [dependencies]
-dotenv = "0.15.0"
+dotenv = "^0.15.0"
 #TODO: Revert to semantic when https://github.com/enigo-rs/enigo/issues/140#issuecomment-1424362153 is fixed
-enigo = { git = "https://github.com/enigo-rs/enigo", rev = "b0b4466" }
-winapi = "0.3.9"
-windows-win = "2.4.1"
-twitch-irc = "5.0.0"
-tokio = { version = "1.25.0", features = [
+enigo = "^0.2.1"
+winapi = "^0.3.9"
+windows-win = "^2.4.1"
+twitch-irc = "^5.0.0"
+tokio = { version = "^1.25.0", features = [
   "rt-multi-thread",
   "macros",
   "full",
   "sync",
 ] }
-queues = "1.1.0"
-serde_json = "1.0.93"
-serde = { version = "1.0.152", features = ["derive"] }
-reqwest = { version = "0.11.27", features = ["blocking", "json"] }
-chrono = "0.4.23"
-simple-websockets = "0.1.5"
-phf = { version = "0.11.1", features = ["macros"] }
+queues = "^1.1.0"
+serde_json = "^1.0.93"
+serde = { version = "^1.0.152", features = ["derive"] }
+reqwest = { version = "^0.11.27", features = ["blocking", "json"] }
+chrono = "^0.4.23"
+simple-websockets = "^0.1.5"
+phf = { version = "^0.11.1", features = ["macros"] }
