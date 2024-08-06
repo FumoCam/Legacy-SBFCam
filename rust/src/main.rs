@@ -223,17 +223,31 @@ fn open_console_chat() {
     mouse_hide(&mut enigo);
 }
 
-fn toggle_console_mouse(window_title: &str) {
-    check_active(window_title);
-    const DELAY: Duration = Duration::from_millis(500);
+fn close_console_with_enter() {
+    // Close constole with enter a few times
+    const DELAY: Duration = Duration::from_millis(300);
     let mut enigo = Enigo::new();
-    mouse_move(&mut enigo, 0.875, 0.03);
     thread::sleep(DELAY);
-    mouse_move(&mut enigo, 0.875, 0.03);
+    enigo.key_click(Key::Return);
     thread::sleep(DELAY);
-    mouse_click(&mut enigo);
-    println!("hotfix_close_console");
+    enigo.key_click(Key::Return);
+    thread::sleep(DELAY);
+    enigo.key_click(Key::Return);
+    thread::sleep(DELAY);
+    enigo.key_click(Key::Return);
 }
+
+// fn toggle_console_mouse(window_title: &str) {
+//     check_active(window_title);
+//     const DELAY: Duration = Duration::from_millis(500);
+//     let mut enigo = Enigo::new();
+//     mouse_move(&mut enigo, 0.875, 0.03);
+//     thread::sleep(DELAY);
+//     mouse_move(&mut enigo, 0.875, 0.03);
+//     thread::sleep(DELAY);
+//     mouse_click(&mut enigo);
+//     println!("hotfix_close_console");
+// }
 
 fn click_console_input() {
     const DELAY: Duration = Duration::from_millis(500);
@@ -249,7 +263,6 @@ fn click_console_input() {
 fn run_console_command(window_title: &str, command: &str) {
     check_active(window_title);
     open_console_chat();
-    // toggle_console_mouse(window_title);
     thread::sleep(Duration::from_millis(750));
     click_console_input();
     let mut enigo = Enigo::new();
@@ -257,11 +270,8 @@ fn run_console_command(window_title: &str, command: &str) {
     enigo.key_sequence(command);
     thread::sleep(Duration::from_millis(750));
     enigo.key_click(Key::Return);
-    // Needs double click?
     thread::sleep(Duration::from_millis(750));
-    toggle_console_mouse(window_title);
-    thread::sleep(Duration::from_millis(750));
-    toggle_console_mouse(window_title);
+    close_console_with_enter();
 }
 
 async fn discord_log(
@@ -664,8 +674,7 @@ pub async fn queue_processor(
                     println!("Loaded in: {loaded_in}");
                     if loaded_in {
                         hotfix_close_motd(&bot_config.game_name);
-                        open_console_chat();
-                        toggle_console_mouse(&bot_config.game_name);
+                        thread::sleep(Duration::from_millis(2000));
                     } else {
                         notify_admin("Failed to load in!").await.ok();
                     }
