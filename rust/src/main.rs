@@ -9,7 +9,11 @@
     clippy::items_after_statements
 )]
 use chrono::Timelike;
-use enigo::{Enigo, Key, KeyboardControllable, MouseButton, MouseControllable};
+use enigo::{
+    Button, Coordinate,
+    Direction::{Click, Press, Release},
+    Enigo, Key, Keyboard, Mouse, Settings,
+};
 use phf::phf_set;
 use serde_json::json;
 use std::cmp::Ordering;
@@ -39,40 +43,40 @@ fn capitalize_string(s: &str) -> String {
 
 fn move_direction(direction: &str, duration: f64) {
     let direction_char = direction.chars().next().expect("string is empty");
-    let direction_key = Key::Layout(direction_char);
+    let direction_key = Key::Unicode(direction_char);
     const MOVE_RATIO: f64 = 600.0;
     let true_duration = (duration * MOVE_RATIO).round() as u64;
     let delay: Duration = Duration::from_millis(true_duration);
-    let mut enigo = Enigo::new();
-    enigo.key_down(direction_key);
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
+    enigo.key(direction_key, Press).unwrap();
     thread::sleep(delay);
-    enigo.key_up(direction_key);
+    enigo.key(direction_key, Release).unwrap();
 }
 
 fn camera_zoom(direction: &str, duration: f64) {
     let direction_char = direction.chars().next().expect("string is empty");
-    let direction_key = Key::Layout(direction_char);
+    let direction_key = Key::Unicode(direction_char);
     const ZOOM_RATIO: f64 = 25.0;
     let true_duration = (duration * ZOOM_RATIO).round() as u64;
     let delay: Duration = Duration::from_millis(true_duration);
-    let mut enigo = Enigo::new();
-    enigo.key_down(direction_key);
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
+    enigo.key(direction_key, Press).unwrap();
     thread::sleep(delay);
-    enigo.key_up(direction_key);
+    enigo.key(direction_key, Release).unwrap();
 }
 
 fn camera_x(x_ratio: f32) {
     const DELAY: Duration = Duration::from_millis(300);
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     const EULER_MOUSEX_MULTI: f32 = 2.0; //2.5; // 90 * this will rotate 90 degrees
     let x_amount = (EULER_MOUSEX_MULTI * x_ratio).round() as i32;
     mouse_move(&mut enigo, 0.5, 0.5);
     thread::sleep(DELAY);
-    enigo.mouse_down(MouseButton::Right);
+    enigo.button(Button::Right, Press).unwrap();
     thread::sleep(DELAY);
-    enigo.mouse_move_relative(x_amount, 0);
+    enigo.move_mouse(x_amount, 0, Coordinate::Rel).unwrap();
     thread::sleep(DELAY);
-    enigo.mouse_up(MouseButton::Right);
+    enigo.button(Button::Right, Release).unwrap();
     thread::sleep(DELAY);
     mouse_move_trigger(&mut enigo);
     thread::sleep(DELAY);
@@ -81,16 +85,16 @@ fn camera_x(x_ratio: f32) {
 
 fn camera_y(y_ratio: f32) {
     const DELAY: Duration = Duration::from_millis(300);
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     const EULER_MOUSEY_MULTI: f32 = 2.861_111; // 180 * this will rotate up/down 100%
     let y_amount = (EULER_MOUSEY_MULTI * y_ratio).round() as i32;
     mouse_move(&mut enigo, 0.5, 0.5);
     thread::sleep(DELAY);
-    enigo.mouse_down(MouseButton::Right);
+    enigo.button(Button::Right, Press).unwrap();
     thread::sleep(DELAY);
-    enigo.mouse_move_relative(0, y_amount);
+    enigo.move_mouse(0, y_amount, Coordinate::Rel).unwrap();
     thread::sleep(DELAY);
-    enigo.mouse_up(MouseButton::Right);
+    enigo.button(Button::Right, Release).unwrap();
     thread::sleep(DELAY);
     mouse_move_trigger(&mut enigo);
     thread::sleep(DELAY);
@@ -100,31 +104,31 @@ fn camera_y(y_ratio: f32) {
 fn leap(forward_amount: f64, spacebar_amount: f64, direction: char) {
     let forward_ms = (forward_amount * 1000.0).round() as u64;
     let spacebar_ms = (spacebar_amount * 1000.0).round() as u64;
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     if forward_ms >= spacebar_ms {
         let forward_delay: Duration = Duration::from_millis(forward_ms - spacebar_ms);
         let spacebar_delay: Duration = Duration::from_millis(spacebar_ms);
-        enigo.key_down(Key::Layout(direction));
-        enigo.key_down(Key::Space);
+        enigo.key(Key::Unicode(direction), Press).unwrap();
+        enigo.key(Key::Space, Press).unwrap();
         thread::sleep(spacebar_delay);
-        enigo.key_up(Key::Space);
+        enigo.key(Key::Space, Release).unwrap();
         thread::sleep(forward_delay);
-        enigo.key_up(Key::Layout(direction));
+        enigo.key(Key::Unicode(direction), Release).unwrap();
     } else {
         let spacebar_delay: Duration = Duration::from_millis(spacebar_ms - forward_ms);
         let forward_delay: Duration = Duration::from_millis(forward_ms);
-        enigo.key_down(Key::Layout(direction));
-        enigo.key_down(Key::Space);
+        enigo.key(Key::Unicode(direction), Press).unwrap();
+        enigo.key(Key::Space, Press).unwrap();
         thread::sleep(forward_delay);
-        enigo.key_up(Key::Layout(direction));
+        enigo.key(Key::Unicode(direction), Release).unwrap();
         thread::sleep(spacebar_delay);
-        enigo.key_up(Key::Space);
+        enigo.key(Key::Space, Release).unwrap();
     }
 }
 
 fn navbar_grief() {
     const DELAY: Duration = Duration::from_millis(300);
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     mouse_move(&mut enigo, 0.62, 0.95);
     thread::sleep(DELAY);
     mouse_click(&mut enigo);
@@ -134,7 +138,7 @@ fn navbar_grief() {
 
 fn navbar_sit() {
     const DELAY: Duration = Duration::from_millis(300);
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     mouse_move(&mut enigo, 0.25, 0.95);
     thread::sleep(DELAY);
     mouse_click(&mut enigo);
@@ -148,16 +152,16 @@ fn mouse_move(enigo: &mut Enigo, x_ratio: f32, y_ratio: f32) {
 
     let x: i32 = (x_ratio * SCREEN_W).round() as i32;
     let y: i32 = (y_ratio * SCREEN_H).round() as i32;
-    enigo.mouse_move_to(x, y);
+    enigo.move_mouse(x, y, Coordinate::Abs).unwrap();
     mouse_move_trigger(enigo);
 }
 fn mouse_move_trigger(enigo: &mut Enigo) {
-    enigo.mouse_move_relative(-1, -1);
-    enigo.mouse_move_relative(1, 1);
+    enigo.move_mouse(-1, -1, Coordinate::Rel).unwrap();
+    enigo.move_mouse(1, 1, Coordinate::Rel).unwrap();
 }
 fn mouse_click(enigo: &mut Enigo) {
-    enigo.mouse_down(MouseButton::Left);
-    enigo.mouse_up(MouseButton::Left);
+    enigo.button(Button::Left, Press).unwrap();
+    enigo.button(Button::Left, Release).unwrap();
 }
 fn mouse_hide(enigo: &mut Enigo) {
     mouse_move(enigo, 1.0, 1.0);
@@ -165,26 +169,26 @@ fn mouse_hide(enigo: &mut Enigo) {
 }
 
 fn send_system_chat(msg: &str) {
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     let suffixed_msg = format!("{msg} "); // Space suffix, to avoid cutoff
     let type_delay = Duration::from_millis(400);
     let send_delay = Duration::from_millis(150);
 
-    enigo.key_click(Key::Layout('/'));
+    enigo.key(Key::Unicode('/'), Click).unwrap();
     thread::sleep(type_delay);
     if msg.starts_with('/') {
         // Chat command
-        enigo.key_sequence(msg.as_ref());
+        enigo.text(msg.as_ref()).unwrap();
     } else {
         // Standard message
-        enigo.key_sequence(suffixed_msg.as_ref());
+        enigo.text(suffixed_msg.as_ref()).unwrap();
     }
     thread::sleep(send_delay);
-    enigo.key_click(Key::Return);
+    enigo.key(Key::Return, Click).unwrap();
 }
 
 fn send_user_chat(author: &str, msg: &str) {
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
 
     // TODO: Undo, temp fix to combat spam safeguards
     // let suffixed_author = format!("{author} "); // Space suffix, to avoid cutoff
@@ -204,17 +208,17 @@ fn send_user_chat(author: &str, msg: &str) {
     // thread::sleep(author_delay);
 
     // Message
-    enigo.key_click(Key::Layout('/'));
+    enigo.key(Key::Unicode('/'), Click).unwrap();
     thread::sleep(type_delay);
-    enigo.key_sequence(&total_msg);
+    enigo.text(&total_msg).unwrap();
     thread::sleep(send_delay);
-    enigo.key_click(Key::Return);
+    enigo.key(Key::Return, Click).unwrap();
 }
 
 fn open_console_chat() {
     // Open console using chat commands
     const DELAY: Duration = Duration::from_millis(300);
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     send_system_chat(&String::from("/sbfconsole"));
     mouse_move(&mut enigo, 0.5, 0.225);
     thread::sleep(DELAY);
@@ -226,21 +230,21 @@ fn open_console_chat() {
 fn close_console_with_enter() {
     // Close constole with enter a few times
     const DELAY: Duration = Duration::from_millis(300);
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     thread::sleep(DELAY);
-    enigo.key_click(Key::Return);
+    enigo.key(Key::Return, Click).unwrap();
     thread::sleep(DELAY);
-    enigo.key_click(Key::Return);
+    enigo.key(Key::Return, Click).unwrap();
     thread::sleep(DELAY);
-    enigo.key_click(Key::Return);
+    enigo.key(Key::Return, Click).unwrap();
     thread::sleep(DELAY);
-    enigo.key_click(Key::Return);
+    enigo.key(Key::Return, Click).unwrap();
 }
 
 // fn toggle_console_mouse(window_title: &str) {
 //     check_active(window_title);
 //     const DELAY: Duration = Duration::from_millis(500);
-//     let mut enigo = Enigo::new();
+//     let mut enigo = Enigo::new(&Settings::default()).unwrap();
 //     mouse_move(&mut enigo, 0.875, 0.03);
 //     thread::sleep(DELAY);
 //     mouse_move(&mut enigo, 0.875, 0.03);
@@ -251,7 +255,7 @@ fn close_console_with_enter() {
 
 fn click_console_input() {
     const DELAY: Duration = Duration::from_millis(500);
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     mouse_move(&mut enigo, 0.5, 0.23);
     thread::sleep(DELAY);
     mouse_move(&mut enigo, 0.5, 0.23);
@@ -265,11 +269,11 @@ fn run_console_command(window_title: &str, command: &str) {
     open_console_chat();
     thread::sleep(Duration::from_millis(750));
     click_console_input();
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     thread::sleep(Duration::from_millis(750));
-    enigo.key_sequence(command);
+    enigo.text(command).unwrap();
     thread::sleep(Duration::from_millis(750));
-    enigo.key_click(Key::Return);
+    enigo.key(Key::Return, Click).unwrap();
     thread::sleep(Duration::from_millis(750));
     close_console_with_enter();
 }
@@ -555,7 +559,7 @@ pub async fn queue_processor(
                     if client_origin {
                         instruction_history.push(history_entry);
                     }
-                    let mut enigo = Enigo::new();
+                    let mut enigo = Enigo::new(&Settings::default()).unwrap();
                     mouse_hide(&mut enigo);
                 }
                 Instruction::Grief {} => {
@@ -2734,7 +2738,7 @@ fn get_pixel(
 fn cv_get_backpack_hover(window_title: &str) -> bool {
     check_active(window_title);
     const DELAY: Duration = Duration::from_millis(500);
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     mouse_move(&mut enigo, 0.47, 0.95);
     thread::sleep(DELAY);
     mouse_move(&mut enigo, 0.47, 0.95);
@@ -2744,7 +2748,7 @@ fn cv_get_backpack_hover(window_title: &str) -> bool {
 fn cv_get_navbar(window_title: &str) -> bool {
     check_active(window_title);
     const DELAY: Duration = Duration::from_millis(500);
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     mouse_move(&mut enigo, 0.47, 0.99);
     thread::sleep(DELAY);
     mouse_move(&mut enigo, 0.47, 0.99);
@@ -2754,7 +2758,7 @@ fn cv_get_navbar(window_title: &str) -> bool {
 fn cv_get_navbar_hidden(window_title: &str) -> bool {
     check_active(window_title);
     const DELAY: Duration = Duration::from_millis(500);
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     mouse_hide(&mut enigo);
     thread::sleep(DELAY);
     mouse_hide(&mut enigo);
@@ -2765,7 +2769,7 @@ fn cv_get_navbar_hidden(window_title: &str) -> bool {
 fn hotfix_close_motd(window_title: &str) {
     check_active(window_title);
     const DELAY: Duration = Duration::from_millis(500);
-    let mut enigo = Enigo::new();
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
     mouse_move(&mut enigo, 0.2, 0.78);
     thread::sleep(DELAY);
     mouse_move(&mut enigo, 0.2, 0.78);

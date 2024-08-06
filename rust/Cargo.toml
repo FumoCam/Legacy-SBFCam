@@ -20,7 +20,7 @@ tokio = { version = "^1.25.0", features = [
 queues = "^1.1.0"
 serde_json = "^1.0.93"
 serde = { version = "^1.0.152", features = ["derive"] }
-reqwest = { version = "^0.11.27", features = ["blocking", "json"] }
+reqwest = { version = "^0.12.5", features = ["blocking", "json"] }
 chrono = "^0.4.23"
 simple-websockets = "^0.1.5"
 phf = { version = "^0.11.1", features = ["macros"] }
