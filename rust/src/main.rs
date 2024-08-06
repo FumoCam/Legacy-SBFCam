@@ -12,7 +12,7 @@ use chrono::Timelike;
 use enigo::{
     Button, Coordinate,
     Direction::{Click, Press, Release},
-    Enigo, Key, Keyboard, Mouse, Settings,
+    Enigo, Keyboard, Mouse, Settings,
 };
 use phf::phf_set;
 use serde_json::json;
@@ -37,32 +37,56 @@ use twitch_irc::{ClientConfig, SecureTCPTransport};
 
 static VALID_DIRECTIONS: phf::Set<char> = phf_set! {'w', 'a', 's', 'd'};
 
+mod scancode {
+    pub const W: u16 = 0x11;
+    pub const A: u16 = 0x1E;
+    pub const S: u16 = 0x1F;
+    pub const D: u16 = 0x20;
+    pub const O: u16 = 0x18;
+    pub const I: u16 = 0x17;
+    pub const SPACE: u16 = 0x39;
+    pub const SLASH: u16 = 0x35;
+    pub const ENTER: u16 = 0x1C;
+}
+
+fn char_to_scancode(c: char) -> u16 {
+    match c {
+        'w' => scancode::W,
+        'a' => scancode::A,
+        's' => scancode::S,
+        'd' => scancode::D,
+        'o' => scancode::O,
+        'i' => scancode::I,
+        _ => panic!("Invalid input character"),
+    }
+}
+
 fn capitalize_string(s: &str) -> String {
     s[0..1].to_uppercase() + &s[1..]
 }
 
 fn move_direction(direction: &str, duration: f64) {
     let direction_char = direction.chars().next().expect("string is empty");
-    let direction_key = Key::Unicode(direction_char);
+    let direction_scancode = char_to_scancode(direction_char);
     const MOVE_RATIO: f64 = 600.0;
     let true_duration = (duration * MOVE_RATIO).round() as u64;
     let delay: Duration = Duration::from_millis(true_duration);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    enigo.key(direction_key, Press).unwrap();
+    enigo.raw(direction_scancode, Press).unwrap();
     thread::sleep(delay);
-    enigo.key(direction_key, Release).unwrap();
+    enigo.raw(direction_scancode, Release).unwrap();
 }
 
 fn camera_zoom(direction: &str, duration: f64) {
     let direction_char = direction.chars().next().expect("string is empty");
-    let direction_key = Key::Unicode(direction_char);
+    let direction_scancode = char_to_scancode(direction_char);
     const ZOOM_RATIO: f64 = 25.0;
     let true_duration = (duration * ZOOM_RATIO).round() as u64;
     let delay: Duration = Duration::from_millis(true_duration);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    enigo.key(direction_key, Press).unwrap();
+    enigo.raw(direction_scancode, Press).unwrap();
     thread::sleep(delay);
-    enigo.key(direction_key, Release).unwrap();
+    enigo.raw(direction_scancode, Release).unwrap();
 }
 
 fn camera_x(x_ratio: f32) {
@@ -104,25 +128,26 @@ fn camera_y(y_ratio: f32) {
 fn leap(forward_amount: f64, spacebar_amount: f64, direction: char) {
     let forward_ms = (forward_amount * 1000.0).round() as u64;
     let spacebar_ms = (spacebar_amount * 1000.0).round() as u64;
+    let direction_scancode = char_to_scancode(direction);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
     if forward_ms >= spacebar_ms {
         let forward_delay: Duration = Duration::from_millis(forward_ms - spacebar_ms);
         let spacebar_delay: Duration = Duration::from_millis(spacebar_ms);
-        enigo.key(Key::Unicode(direction), Press).unwrap();
-        enigo.key(Key::Space, Press).unwrap();
+        enigo.raw(direction_scancode, Press).unwrap();
+        enigo.raw(scancode::SPACE, Press).unwrap();
         thread::sleep(spacebar_delay);
-        enigo.key(Key::Space, Release).unwrap();
+        enigo.raw(scancode::SPACE, Release).unwrap();
         thread::sleep(forward_delay);
-        enigo.key(Key::Unicode(direction), Release).unwrap();
+        enigo.raw(direction_scancode, Release).unwrap();
     } else {
         let spacebar_delay: Duration = Duration::from_millis(spacebar_ms - forward_ms);
         let forward_delay: Duration = Duration::from_millis(forward_ms);
-        enigo.key(Key::Unicode(direction), Press).unwrap();
-        enigo.key(Key::Space, Press).unwrap();
+        enigo.raw(direction_scancode, Press).unwrap();
+        enigo.raw(scancode::SPACE, Press).unwrap();
         thread::sleep(forward_delay);
-        enigo.key(Key::Unicode(direction), Release).unwrap();
+        enigo.raw(direction_scancode, Release).unwrap();
         thread::sleep(spacebar_delay);
-        enigo.key(Key::Space, Release).unwrap();
+        enigo.raw(scancode::SPACE, Release).unwrap();
     }
 }
 
@@ -174,7 +199,7 @@ fn send_system_chat(msg: &str) {
     let type_delay = Duration::from_millis(400);
     let send_delay = Duration::from_millis(150);
 
-    enigo.key(Key::Unicode('/'), Click).unwrap();
+    enigo.raw(scancode::SLASH, Click).unwrap();
     thread::sleep(type_delay);
     if msg.starts_with('/') {
         // Chat command
@@ -184,7 +209,7 @@ fn send_system_chat(msg: &str) {
         enigo.text(suffixed_msg.as_ref()).unwrap();
     }
     thread::sleep(send_delay);
-    enigo.key(Key::Return, Click).unwrap();
+    enigo.raw(scancode::ENTER, Click).unwrap();
 }
 
 fn send_user_chat(author: &str, msg: &str) {
@@ -208,11 +233,11 @@ fn send_user_chat(author: &str, msg: &str) {
     // thread::sleep(author_delay);
 
     // Message
-    enigo.key(Key::Unicode('/'), Click).unwrap();
+    enigo.raw(scancode::SLASH, Click).unwrap();
     thread::sleep(type_delay);
     enigo.text(&total_msg).unwrap();
     thread::sleep(send_delay);
-    enigo.key(Key::Return, Click).unwrap();
+    enigo.raw(scancode::ENTER, Click).unwrap();
 }
 
 fn open_console_chat() {
@@ -232,13 +257,13 @@ fn close_console_with_enter() {
     const DELAY: Duration = Duration::from_millis(300);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
     thread::sleep(DELAY);
-    enigo.key(Key::Return, Click).unwrap();
+    enigo.raw(scancode::ENTER, Click).unwrap();
     thread::sleep(DELAY);
-    enigo.key(Key::Return, Click).unwrap();
+    enigo.raw(scancode::ENTER, Click).unwrap();
     thread::sleep(DELAY);
-    enigo.key(Key::Return, Click).unwrap();
+    enigo.raw(scancode::ENTER, Click).unwrap();
     thread::sleep(DELAY);
-    enigo.key(Key::Return, Click).unwrap();
+    enigo.raw(scancode::ENTER, Click).unwrap();
 }
 
 // fn toggle_console_mouse(window_title: &str) {
@@ -273,7 +298,7 @@ fn run_console_command(window_title: &str, command: &str) {
     thread::sleep(Duration::from_millis(750));
     enigo.text(command).unwrap();
     thread::sleep(Duration::from_millis(750));
-    enigo.key(Key::Return, Click).unwrap();
+    enigo.raw(scancode::ENTER, Click).unwrap();
     thread::sleep(Duration::from_millis(750));
     close_console_with_enter();
 }
