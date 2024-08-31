@@ -154,7 +154,13 @@ fn leap(forward_amount: f64, spacebar_amount: f64, direction: char) {
 fn navbar_grief() {
     const DELAY: Duration = Duration::from_millis(300);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    mouse_move(&mut enigo, 0.62, 0.95);
+
+    // Default, backpack type 2
+    //mouse_move(&mut enigo, 0.62, 0.95);
+
+    // Hotfix, new backpack type
+    mouse_move(&mut enigo, 0.55, 0.95);
+
     thread::sleep(DELAY);
     mouse_click(&mut enigo);
     thread::sleep(DELAY);
@@ -164,11 +170,17 @@ fn navbar_grief() {
 fn navbar_sit() {
     const DELAY: Duration = Duration::from_millis(300);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    mouse_move(&mut enigo, 0.25, 0.95);
+
+    // Default, packpack type 2
+    // mouse_move(&mut enigo, 0.25, 0.95);
+
+    // Hotfix, new backpack type
+    mouse_move(&mut enigo, 0.32, 0.95);
+
     thread::sleep(DELAY);
     mouse_click(&mut enigo);
     thread::sleep(DELAY);
-    mouse_hide(&mut enigo);
+    //mouse_hide(&mut enigo);
 }
 
 fn mouse_move(enigo: &mut Enigo, x_ratio: f32, y_ratio: f32) {
@@ -2761,16 +2773,28 @@ fn get_pixel(
 }
 
 fn cv_get_backpack_hover(window_title: &str) -> bool {
+    // Checks that the darker grey of the backpack button is visible when hovering in that area
+
     check_active(window_title);
     const DELAY: Duration = Duration::from_millis(500);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    mouse_move(&mut enigo, 0.47, 0.95);
+
+    // Default, backpack type 2, checked backpack button hover
+    // mouse_move(&mut enigo, 0.47, 0.95);
+    // thread::sleep(DELAY);
+    // mouse_move(&mut enigo, 0.47, 0.95);
+    // get_pixel(575, 680, 10, 5, 179, 179, 179)
+
+    // Hotfix, new backpack type, check grief instead
+    mouse_move(&mut enigo, 0.55, 0.95);
     thread::sleep(DELAY);
-    mouse_move(&mut enigo, 0.47, 0.95);
+    mouse_move(&mut enigo, 0.55, 0.95);
     println!("cv_get_backpack_hover");
-    get_pixel(575, 680, 10, 5, 179, 179, 179)
+    get_pixel(691, 690, 9, 5, 179, 179, 179)
 }
 fn cv_get_navbar(window_title: &str) -> bool {
+    // Checks that the white of unhovered buttons is visible when not hovering
+
     check_active(window_title);
     const DELAY: Duration = Duration::from_millis(500);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
@@ -2778,7 +2802,12 @@ fn cv_get_navbar(window_title: &str) -> bool {
     thread::sleep(DELAY);
     mouse_move(&mut enigo, 0.47, 0.99);
     println!("cv_get_navbar");
-    get_pixel(575, 680, 10, 5, 255, 255, 255)
+
+    // Default, backpack type 2, checked backpack button hover
+    // get_pixel(575, 680, 10, 5, 255, 255, 255)
+
+    // Hotfix, new backpack type, check grief instead
+    get_pixel(691, 690, 9, 5, 255, 255, 255)
 }
 fn cv_get_navbar_hidden(window_title: &str) -> bool {
     check_active(window_title);
