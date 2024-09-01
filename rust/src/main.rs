@@ -180,7 +180,7 @@ fn navbar_sit() {
     thread::sleep(DELAY);
     mouse_click(&mut enigo);
     thread::sleep(DELAY);
-    //mouse_hide(&mut enigo);
+    mouse_hide(&mut enigo);
 }
 
 fn mouse_move(enigo: &mut Enigo, x_ratio: f32, y_ratio: f32) {
@@ -754,7 +754,8 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
             ("sewers", "Rat Sewers"),
             ("shrimp", "Shreimp Mart"),
             ("sky", "Floating Island"),
-            ("somewhere", "somewhere"),
+            ("checkers", "Checkers"),
+            ("spooky", "spooky area"),
         ]
         .map(|(a, b)| (String::from(a), String::from(b))),
     );
