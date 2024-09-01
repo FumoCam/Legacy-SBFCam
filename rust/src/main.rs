@@ -2146,14 +2146,7 @@ pub async fn anti_afk_loop(
                 InstructionPair {
                     execution_order: 1,
                     instruction: Instruction::SystemChatMessage {
-                        message: "You can control this bot live!".to_string(),
-                    },
-                },
-                InstructionPair {
-                    execution_order: 2,
-                    instruction: Instruction::SystemChatMessage {
-                        message: "Go to its Roblox profile and click the purple T witch icon!"
-                            .to_string(),
+                        message: "You can control this bot! Go to its Roblox profile and click the purple T witch icon!".to_string(),
                     },
                 },
             ],
