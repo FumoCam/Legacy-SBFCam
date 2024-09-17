@@ -160,10 +160,16 @@ fn navbar_grief() {
 
     // Hotfix, new backpack type
     mouse_move(&mut enigo, 0.55, 0.95);
-
     thread::sleep(DELAY);
     mouse_click(&mut enigo);
     thread::sleep(DELAY);
+
+    // Hotfix, UI moves up over time so try that too
+    mouse_move(&mut enigo, 0.55, 0.87);
+    thread::sleep(DELAY);
+    mouse_click(&mut enigo);
+    thread::sleep(DELAY);
+
     mouse_hide(&mut enigo);
 }
 
@@ -176,10 +182,16 @@ fn navbar_sit() {
 
     // Hotfix, new backpack type
     mouse_move(&mut enigo, 0.32, 0.95);
-
     thread::sleep(DELAY);
     mouse_click(&mut enigo);
     thread::sleep(DELAY);
+
+    // Hotfix, UI moves up over time so try that too
+    mouse_move(&mut enigo, 0.32, 0.87);
+    thread::sleep(DELAY);
+    mouse_click(&mut enigo);
+    thread::sleep(DELAY);
+
     mouse_hide(&mut enigo);
 }
 
@@ -3022,9 +3034,10 @@ pub async fn main() {
 
     let bot_config = init_config();
     let bot_state = init_state();
-    //check_active(&bot_config.game_name);
+    // check_active(&bot_config.game_name);
+    // navbar_sit();
     // click_console_input();
-    //run_console_command(&bot_config.game_name, "test");
+    // run_console_command(&bot_config.game_name, "test");
 
     let (hud_sender, hud_receiver): (
         UnboundedSender<HUDInstruction>,
