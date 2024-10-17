@@ -2011,27 +2011,38 @@ pub async fn twitch_loop(
                         }
                     }
                     "rejoin" => {
-                        let mod_1 = env::var("TWITCH_MOD_1")
-                            .expect("$TWITCH_MOD_1 is not set")
-                            .to_lowercase();
-
-                        let author_name = msg.sender.name.to_string().to_lowercase();
                         let message: &str;
-                        if author_name.to_lowercase() == mod_1.to_lowercase() {
-                            let result =
-                                force_rejoin(queue_sender.clone(), bot_config.clone()).await;
-                            if result {
-                                message = "[Rejoin queued successfully!]";
-                            } else {
-                                message = "[Failed to queue rejoin, Roblox API may be down!]";
-                            }
+                        let result = force_rejoin(queue_sender.clone(), bot_config.clone()).await;
+                        if result {
+                            message = "[Rejoin queued successfully!]";
                         } else {
-                            message = "[You do not have permissions to run this!]";
+                            message = "[Failed to queue rejoin, Roblox API may be down!]";
                         }
                         client
                             .say_in_reply_to(&msg, message.to_string())
                             .await
                             .unwrap();
+                        // let mod_1 = env::var("TWITCH_MOD_1")
+                        //     .expect("$TWITCH_MOD_1 is not set")
+                        //     .to_lowercase();
+
+                        // let author_name = msg.sender.name.to_string().to_lowercase();
+                        // let message: &str;
+                        // if author_name.to_lowercase() == mod_1.to_lowercase() {
+                        //     let result =
+                        //         force_rejoin(queue_sender.clone(), bot_config.clone()).await;
+                        //     if result {
+                        //         message = "[Rejoin queued successfully!]";
+                        //     } else {
+                        //         message = "[Failed to queue rejoin, Roblox API may be down!]";
+                        //     }
+                        // } else {
+                        //     message = "[You do not have permissions to run this!]";
+                        // }
+                        // client
+                        //     .say_in_reply_to(&msg, message.to_string())
+                        //     .await
+                        //     .unwrap();
                     }
                     _ => {
                         client
