@@ -15,17 +15,18 @@ use enigo::{
     Enigo, Keyboard, Mouse, Settings,
 };
 use phf::phf_set;
-use serde_json::json;
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::env;
-use std::error::Error;
+use reqwest::StatusCode;
+use serde_json::{json, Value};
 use std::process::Command;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::thread;
 use std::time::Duration;
+use std::{cmp::Ordering, path::Path};
+use std::{collections::HashMap, fs::File};
+use std::{env, io::Read};
+use std::{error::Error, io};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use twitch_irc::login::StaticLoginCredentials;
 use twitch_irc::message::PrivmsgMessage;
@@ -2032,11 +2033,13 @@ pub struct BotConfig {
     game_name: String,
     game_executable: String,
     game_id: i64,
+    cookies_str: String,
+    presence_req_body: Value,
     hat_types: HashMap<String, String>,
     tp_locations: HashMap<String, String>,
     twitch_bot_username: String,
     twitch_bot_token: String,
-    player_token: String,
+    // player_token: String,
     twitch_channel_name: String,
     valid_hat_types: String,
     valid_tp_locations: String,
@@ -2047,6 +2050,19 @@ pub fn init_config() -> BotConfig {
     let game_name: String = "Roblox".to_string();
     let game_executable: String = "RobloxPlayerBeta.exe".to_string();
     let game_id: i64 = 7_363_647_365;
+    let cookies_str = load_cookies_str().unwrap();
+    let presence_req_body = json!({
+        "userIds": [
+            // 2558280992, // F_umoCam02
+            // 3045394671, // F_umoCam05
+            3_405_264_198_u64, // SBFCam_01
+            3_405_266_379_u64, // SBFCam_02
+            3_552_722_205_u64, // SBFCam_03
+            3_554_945_279_u64, // SBFCam_05
+            3_876_348_683_u64, // SBFCam_06
+        ]
+    });
+
     let twitch_channel_name: String = "sbfcam".to_string();
     let twitch_bot_username: String = "sbfcamBOT".to_string();
 
@@ -2055,17 +2071,19 @@ pub fn init_config() -> BotConfig {
 
     //Oauth (generated with https://twitchtokengenerator.com/):
     let twitch_bot_token = env::var("TWITCH_BOT_TOKEN").expect("$TWITCH_BOT_TOKEN is not set");
-    let player_token = env::var("PLAYER_TOKEN").expect("$PLAYER_TOKEN is not set");
+    // let player_token = env::var("PLAYER_TOKEN").expect("$PLAYER_TOKEN is not set");
 
     BotConfig {
         game_name,
         game_executable,
         game_id,
+        cookies_str,
+        presence_req_body,
         hat_types,
         tp_locations,
         twitch_bot_username,
         twitch_bot_token,
-        player_token,
+        // player_token,
         twitch_channel_name,
         valid_hat_types,
         valid_tp_locations,
@@ -2133,14 +2151,7 @@ pub async fn anti_afk_loop(
                 InstructionPair {
                     execution_order: 1,
                     instruction: Instruction::SystemChatMessage {
-                        message: "You can control this bot live!".to_string(),
-                    },
-                },
-                InstructionPair {
-                    execution_order: 2,
-                    instruction: Instruction::SystemChatMessage {
-                        message: "Go to its Roblox profile and click the purple T witch icon!"
-                            .to_string(),
+                        message: "You can control this bot live! Go to its Roblox profile and click the purple T witch icon!".to_string(),
                     },
                 },
             ],
@@ -2154,7 +2165,8 @@ pub async fn anti_afk_loop(
 #[derive(Debug, Clone)]
 pub struct GameInstance {
     id: String,
-    players: Vec<String>,
+    // players: Vec<String>,
+    playing: i64,
 }
 const UNKNOWN_SERVER_ID: &str = "UNKNOWN";
 
@@ -2198,9 +2210,11 @@ pub async fn get_instances(game_id: i64) -> Result<Option<Vec<GameInstance>>, Bo
         for player in players_raw {
             players.push(player.as_str().unwrap().to_string());
         }
+        let playing = place.get("playing").unwrap().as_i64().unwrap();
         let instance = GameInstance {
             id: place.get("id").unwrap().as_str().unwrap().to_string(),
-            players,
+            // players,
+            playing,
         };
         instance_list.push(instance);
     }
@@ -2208,38 +2222,43 @@ pub async fn get_instances(game_id: i64) -> Result<Option<Vec<GameInstance>>, Bo
     Ok(Some(instance_list))
 }
 
-fn get_current_server(player_token: &String, instance_list: Vec<GameInstance>) -> GameInstance {
+fn get_current_server(
+    current_server_id: &String,
+    instance_list: Vec<GameInstance>,
+) -> GameInstance {
     for instance in instance_list {
         println!("{}", instance.id);
-        if instance.players.contains(player_token) {
+        if instance.id.as_str() == current_server_id {
             return instance;
         }
     }
     GameInstance {
         id: UNKNOWN_SERVER_ID.to_string(),
-        players: vec![],
+        // players: vec![],
+        playing: -1,
     }
 }
 
-fn check_in_server(player_token: &String, instance_list: Vec<GameInstance>) -> bool {
-    let current_server = get_current_server(player_token, instance_list);
+fn check_in_server(current_server_id: &String, instance_list: Vec<GameInstance>) -> bool {
+    let current_server = get_current_server(current_server_id, instance_list);
     current_server.id != *UNKNOWN_SERVER_ID
 }
 
 fn get_best_server(instance_list: Vec<GameInstance>) -> GameInstance {
     let mut best_server = GameInstance {
         id: UNKNOWN_SERVER_ID.to_string(),
-        players: vec![],
+        // players: vec![],
+        playing: -1,
     };
     for instance in instance_list {
-        if best_server.players.len() < instance.players.len() {
+        if best_server.playing < instance.playing {
             best_server = instance;
         }
     }
     best_server
 }
 
-fn check_in_best_server(player_token: &String, instance_list: Vec<GameInstance>) -> bool {
+fn check_in_best_server(current_server_id: &String, instance_list: Vec<GameInstance>) -> bool {
     const LOW_SWITCH: usize = 2;
     const LOW_SWITCH_THRESH: usize = 7;
     const HIGH_SWITCH: usize = 5;
@@ -2251,11 +2270,12 @@ fn check_in_best_server(player_token: &String, instance_list: Vec<GameInstance>)
 
     let mut current_server = GameInstance {
         id: UNKNOWN_SERVER_ID.to_string(),
-        players: vec![],
+        // players: vec![],
+        playing: -1,
     };
     for instance in instance_list {
         println!("{}", instance.id);
-        if instance.players.contains(player_token) {
+        if instance.id.as_str() == current_server_id {
             current_server = instance;
             break;
         }
@@ -2269,24 +2289,25 @@ fn check_in_best_server(player_token: &String, instance_list: Vec<GameInstance>)
     // A server would need LOW_SWITCH more players to trigger a switch.
     // Otherwise, a server would need HIGH_SWITCH more players to trigger a switch.
 
-    let required_difference = if best_server.players.len() <= LOW_SWITCH_THRESH {
+    let required_difference = if best_server.playing <= LOW_SWITCH_THRESH.try_into().unwrap() {
         LOW_SWITCH
     } else {
         HIGH_SWITCH
     };
-    let difference = best_server.players.len() - current_server.players.len();
+    let difference = best_server.playing - current_server.playing;
     println!("[Server difference {difference}]");
     println!("[Required switch difference {required_difference}]");
-    difference <= required_difference
+    difference <= required_difference.try_into().unwrap()
 }
 
 fn _force_rejoin(
     queue_sender: &UnboundedSender<SystemInstruction>,
     bot_config: &BotConfig,
     instance_list: Vec<GameInstance>,
+    current_server_id: &String,
 ) {
     let best_server = get_best_server(instance_list.clone());
-    let current_server = get_current_server(&bot_config.player_token, instance_list);
+    let current_server = get_current_server(current_server_id, instance_list);
 
     let mut instructions: Vec<InstructionPair> = vec![];
     if current_server.id != UNKNOWN_SERVER_ID && check_active(&bot_config.game_name) {
@@ -2355,7 +2376,13 @@ async fn force_rejoin(
                     eprintln!("[Roblox API check failed]");
                     false
                 } else {
-                    _force_rejoin(&queue_sender, &bot_config, instance_list);
+                    let current_server_id = get_current_server_id(&bot_config, 1).await;
+                    _force_rejoin(
+                        &queue_sender,
+                        &bot_config,
+                        instance_list,
+                        &current_server_id,
+                    );
                     true
                 }
             } else {
@@ -2392,12 +2419,25 @@ async fn server_check_logic(
         state.initial_boot
     };
 
-    let in_server = check_in_server(&bot_config.player_token, instance_list.clone());
+    let current_server_id = get_current_server_id(&bot_config, 1).await;
+    let in_server = check_in_server(&current_server_id, instance_list.clone());
+    if in_server {
+        println!("Is in a server");
+    } else {
+        println!("Not in a server");
+    }
+
     let in_best_server = if in_server {
-        check_in_best_server(&bot_config.player_token, instance_list.clone())
+        check_in_best_server(&current_server_id, instance_list.clone())
     } else {
         false
     };
+
+    if in_best_server {
+        println!("Is in best server");
+    } else {
+        println!("Not in best server");
+    }
 
     if in_server && in_best_server {
         if is_initial_boot {
@@ -2411,8 +2451,8 @@ async fn server_check_logic(
     }
 
     let best_server = get_best_server(instance_list.clone());
-    let current_server = get_current_server(&bot_config.player_token, instance_list.clone());
-    let difference = best_server.players.len() - current_server.players.len();
+    let current_server = get_current_server(&current_server_id, instance_list.clone());
+    let difference = best_server.playing - current_server.playing;
 
     let instructions: Vec<InstructionPair>;
 
@@ -2554,9 +2594,11 @@ async fn server_check_loop(
 ) {
     let interval_minutes = 3;
     let mut interval = tokio::time::interval(Duration::from_millis(interval_minutes * 60 * 1000));
+    let mut interval2 = tokio::time::interval(Duration::from_millis(1000));
     loop {
-        interval.tick().await;
+        // interval.tick().await;
         let get_instances_result = get_instances(bot_config.game_id).await;
+        interval2.tick().await;
         match get_instances_result {
             Ok(instance_list_option) => match instance_list_option {
                 Some(instance_list) => {
@@ -2581,6 +2623,7 @@ async fn server_check_loop(
                 eprintln!("[Roblox API check failed]");
             }
         }
+        interval.tick().await;
     }
 }
 
@@ -2989,6 +3032,110 @@ pub fn init_state() -> BotState {
     }))
 }
 
+fn load_cookies_str() -> Result<String, io::Error> {
+    let path = Path::new("..\\resources\\selenium\\cookies.json");
+
+    // Open the file or return an error if it doesn't exist.
+    let mut file = File::open(path)?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)?;
+
+    // Parse the JSON content.
+    let cookies: Vec<Value> = serde_json::from_str(&contents)?;
+
+    // Collect cookie name=value pairs into a vector.
+    let cookie_str_vals: Vec<String> = cookies
+        .iter()
+        .map(|cookie| {
+            format!(
+                "{}={}",
+                cookie["name"].as_str().unwrap_or_default(),
+                cookie["value"].as_str().unwrap_or_default()
+            )
+        })
+        .collect();
+
+    // Join all the pairs into a single cookie string.
+    Ok(cookie_str_vals.join("; "))
+}
+
+async fn get_current_server_id(cfg: &BotConfig, attempt_num: u8) -> String {
+    let mut current_server_id = "N/A".to_string();
+    let url = "https://presence.roblox.com/v1/presence/users";
+
+    // Prepare request
+    let client = reqwest::Client::new();
+    let request = client
+        .post(url)
+        .json(&cfg.presence_req_body)
+        .header("Cookie", &cfg.cookies_str)
+        .timeout(Duration::from_secs(10));
+
+    let response = match request.send().await {
+        Ok(res) => res,
+        Err(e) => {
+            eprintln!("Error sending request: {e:?}");
+            return "ERROR".to_string();
+        }
+    };
+
+    // const MAX_ATTEMPTS: u8 = 3;
+    if response.status() == StatusCode::OK {
+        if let Ok(response_result) = response.json::<Value>().await {
+            eprintln!("Response Body: {response_result}");
+            if let Some(presences) = response_result["userPresences"].as_array() {
+                for user in presences {
+                    let presence_type = user["userPresenceType"].as_u64().unwrap_or(0);
+                    let root_place_id = user["rootPlaceId"].as_u64();
+                    let game_id = user["gameId"].as_str().unwrap_or("N/A");
+
+                    if presence_type == 2 && root_place_id.is_none() {
+                        let error_msg =
+                            format!("Error in getting current server id:\n```{response_result}```");
+                        eprintln!("{error_msg}");
+                        let _ = notify_admin(&error_msg).await;
+                        return "ERROR".to_string();
+                    }
+
+                    if root_place_id == Some(cfg.game_id.try_into().unwrap()) {
+                        current_server_id = game_id.to_string();
+                        break;
+                    }
+                }
+            }
+
+            if current_server_id != "ERROR" {
+                println!("Current Server ID is not error: {current_server_id}");
+            }
+
+            return current_server_id;
+        }
+    } else if response.status() == StatusCode::TOO_MANY_REQUESTS {
+        // TODO: Recursion
+        // if attempt_num < MAX_ATTEMPTS {
+        //     let backoff_time = 5 * attempt_num;
+        //     println!("429 hit, attempt #{} in {}s", attempt_num + 1, backoff_time);
+        //     thread::sleep(Duration::from_secs(backoff_time as u64));
+        //     return get_current_server_id(cfg, attempt_num + 1).await;
+        // }
+        // // Else
+        // let backoff_time = 5 * (attempt_num - 1);
+        // println!(
+        //     "Failed to un-ratelimit after {} attempts, {}s waited",
+        //     attempt_num, backoff_time
+        // );
+        let backoff_time = 5 * attempt_num;
+        println!("429 hit, waiting {backoff_time}s");
+        thread::sleep(Duration::from_secs(u64::from(backoff_time)));
+        return "ERROR".to_string();
+    }
+
+    eprintln!("Returning Error on base");
+    //eprintln!("Status: {}", response.status());
+
+    "ERROR".to_string()
+}
+
 // =================
 // [Production Main]
 // =================
@@ -2996,12 +3143,15 @@ pub fn init_state() -> BotState {
 #[tokio::main]
 pub async fn main() {
     dotenv::from_filename("..\\.env").ok();
-
     let bot_config = init_config();
     let bot_state = init_state();
-    //check_active(&bot_config.game_name);
-    // click_console_input();
-    //run_console_command(&bot_config.game_name, "test");
+    let server_id = get_current_server_id(&bot_config, 1).await;
+
+    println!("Server id: {server_id}");
+
+    check_active(&bot_config.game_name);
+    click_console_input();
+    run_console_command(&bot_config.game_name, "test");
 
     let (hud_sender, hud_receiver): (
         UnboundedSender<HUDInstruction>,
