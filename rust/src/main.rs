@@ -3120,6 +3120,9 @@ fn load_cookies_str() -> Result<String, io::Error> {
 }
 
 async fn get_current_server_id(cfg: &BotConfig, attempt_num: u8) -> String {
+    let mut interval = tokio::time::interval(Duration::from_millis(1000));
+    interval.tick().await;
+
     let mut current_server_id = "N/A".to_string();
     let url = "https://presence.roblox.com/v1/presence/users";
 
@@ -3209,6 +3212,12 @@ pub async fn main() {
     // click_console_input();
     //run_console_command(&bot_config.game_name, "test");
 
+    // let cookies_str = load_cookies_str().unwrap();
+    // println!("Cookies Str: {cookies_str}");
+
+    // let current_server_id = get_current_server_id(&bot_config, 1).await;
+    // println!("Current Server ID: {current_server_id}");
+    // return;
     let (hud_sender, hud_receiver): (
         UnboundedSender<HUDInstruction>,
         UnboundedReceiver<HUDInstruction>,
