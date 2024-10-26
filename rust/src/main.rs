@@ -155,20 +155,44 @@ fn leap(forward_amount: f64, spacebar_amount: f64, direction: char) {
 fn navbar_grief() {
     const DELAY: Duration = Duration::from_millis(300);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    mouse_move(&mut enigo, 0.62, 0.95);
+
+    // Default, backpack type 2
+    //mouse_move(&mut enigo, 0.62, 0.95);
+
+    // Hotfix, new backpack type
+    mouse_move(&mut enigo, 0.55, 0.95);
     thread::sleep(DELAY);
     mouse_click(&mut enigo);
     thread::sleep(DELAY);
+
+    // Hotfix, UI moves up over time so try that too
+    mouse_move(&mut enigo, 0.55, 0.87);
+    thread::sleep(DELAY);
+    mouse_click(&mut enigo);
+    thread::sleep(DELAY);
+
     mouse_hide(&mut enigo);
 }
 
 fn navbar_sit() {
     const DELAY: Duration = Duration::from_millis(300);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    mouse_move(&mut enigo, 0.25, 0.95);
+
+    // Default, packpack type 2
+    // mouse_move(&mut enigo, 0.25, 0.95);
+
+    // Hotfix, new backpack type
+    mouse_move(&mut enigo, 0.32, 0.95);
     thread::sleep(DELAY);
     mouse_click(&mut enigo);
     thread::sleep(DELAY);
+
+    // Hotfix, UI moves up over time so try that too
+    mouse_move(&mut enigo, 0.32, 0.87);
+    thread::sleep(DELAY);
+    mouse_click(&mut enigo);
+    thread::sleep(DELAY);
+
     mouse_hide(&mut enigo);
 }
 
@@ -743,7 +767,8 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
             ("sewers", "Rat Sewers"),
             ("shrimp", "Shreimp Mart"),
             ("sky", "Floating Island"),
-            ("somewhere", "somewhere"),
+            ("checkers", "Checkers"),
+            ("spooky", "spooky area"),
         ]
         .map(|(a, b)| (String::from(a), String::from(b))),
     );
@@ -1987,27 +2012,38 @@ pub async fn twitch_loop(
                         }
                     }
                     "rejoin" => {
-                        let mod_1 = env::var("TWITCH_MOD_1")
-                            .expect("$TWITCH_MOD_1 is not set")
-                            .to_lowercase();
-
-                        let author_name = msg.sender.name.to_string().to_lowercase();
                         let message: &str;
-                        if author_name.to_lowercase() == mod_1.to_lowercase() {
-                            let result =
-                                force_rejoin(queue_sender.clone(), bot_config.clone()).await;
-                            if result {
-                                message = "[Rejoin queued successfully!]";
-                            } else {
-                                message = "[Failed to queue rejoin, Roblox API may be down!]";
-                            }
+                        let result = force_rejoin(queue_sender.clone(), bot_config.clone()).await;
+                        if result {
+                            message = "[Rejoin queued successfully!]";
                         } else {
-                            message = "[You do not have permissions to run this!]";
+                            message = "[Failed to queue rejoin, Roblox API may be down!]";
                         }
                         client
                             .say_in_reply_to(&msg, message.to_string())
                             .await
                             .unwrap();
+                        // let mod_1 = env::var("TWITCH_MOD_1")
+                        //     .expect("$TWITCH_MOD_1 is not set")
+                        //     .to_lowercase();
+
+                        // let author_name = msg.sender.name.to_string().to_lowercase();
+                        // let message: &str;
+                        // if author_name.to_lowercase() == mod_1.to_lowercase() {
+                        //     let result =
+                        //         force_rejoin(queue_sender.clone(), bot_config.clone()).await;
+                        //     if result {
+                        //         message = "[Rejoin queued successfully!]";
+                        //     } else {
+                        //         message = "[Failed to queue rejoin, Roblox API may be down!]";
+                        //     }
+                        // } else {
+                        //     message = "[You do not have permissions to run this!]";
+                        // }
+                        // client
+                        //     .say_in_reply_to(&msg, message.to_string())
+                        //     .await
+                        //     .unwrap();
                     }
                     _ => {
                         client
@@ -2151,7 +2187,14 @@ pub async fn anti_afk_loop(
                 InstructionPair {
                     execution_order: 1,
                     instruction: Instruction::SystemChatMessage {
-                        message: "You can control this bot live! Go to its Roblox profile and click the purple T witch icon!".to_string(),
+                        message: "You can control this bot live!".to_string(),
+                    },
+                },
+                InstructionPair {
+                    execution_order: 2,
+                    instruction: Instruction::SystemChatMessage {
+                        message: "Go to its Roblox profile and click the purple T witch icon!"
+                            .to_string(),
                     },
                 },
             ],
@@ -2804,16 +2847,28 @@ fn get_pixel(
 }
 
 fn cv_get_backpack_hover(window_title: &str) -> bool {
+    // Checks that the darker grey of the backpack button is visible when hovering in that area
+
     check_active(window_title);
     const DELAY: Duration = Duration::from_millis(500);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    mouse_move(&mut enigo, 0.47, 0.95);
+
+    // Default, backpack type 2, checked backpack button hover
+    // mouse_move(&mut enigo, 0.47, 0.95);
+    // thread::sleep(DELAY);
+    // mouse_move(&mut enigo, 0.47, 0.95);
+    // get_pixel(575, 680, 10, 5, 179, 179, 179)
+
+    // Hotfix, new backpack type, check grief instead
+    mouse_move(&mut enigo, 0.55, 0.95);
     thread::sleep(DELAY);
-    mouse_move(&mut enigo, 0.47, 0.95);
+    mouse_move(&mut enigo, 0.55, 0.95);
     println!("cv_get_backpack_hover");
-    get_pixel(575, 680, 10, 5, 179, 179, 179)
+    get_pixel(691, 690, 9, 5, 179, 179, 179)
 }
 fn cv_get_navbar(window_title: &str) -> bool {
+    // Checks that the white of unhovered buttons is visible when not hovering
+
     check_active(window_title);
     const DELAY: Duration = Duration::from_millis(500);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
@@ -2821,7 +2876,12 @@ fn cv_get_navbar(window_title: &str) -> bool {
     thread::sleep(DELAY);
     mouse_move(&mut enigo, 0.47, 0.99);
     println!("cv_get_navbar");
-    get_pixel(575, 680, 10, 5, 255, 255, 255)
+
+    // Default, backpack type 2, checked backpack button hover
+    // get_pixel(575, 680, 10, 5, 255, 255, 255)
+
+    // Hotfix, new backpack type, check grief instead
+    get_pixel(691, 690, 9, 5, 255, 255, 255)
 }
 fn cv_get_navbar_hidden(window_title: &str) -> bool {
     check_active(window_title);
@@ -3145,13 +3205,9 @@ pub async fn main() {
     dotenv::from_filename("..\\.env").ok();
     let bot_config = init_config();
     let bot_state = init_state();
-    let server_id = get_current_server_id(&bot_config, 1).await;
-
-    println!("Server id: {server_id}");
-
-    check_active(&bot_config.game_name);
-    click_console_input();
-    run_console_command(&bot_config.game_name, "test");
+    //check_active(&bot_config.game_name);
+    // click_console_input();
+    //run_console_command(&bot_config.game_name, "test");
 
     let (hud_sender, hud_receiver): (
         UnboundedSender<HUDInstruction>,
