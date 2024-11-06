@@ -10,7 +10,9 @@ python = "^3.9"
 selenium = "^4.3.0"
 psutil = "^5.9.1"
 mss = "^6.1.0"
-opencv-python = "^4.6.0"
+opencv-python = "4.8.1.78"
+pygetwindow = "^0.0.9"
+pydirectinput = "^1.0.4"
 
 [tool.poetry.dev-dependencies]
 black = "^24.3.0"

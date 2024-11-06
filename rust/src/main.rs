@@ -2577,12 +2577,20 @@ async fn server_check_logic(
             }
             log_admin("Restart detected").await.ok();
         } else {
-            // Crash
+            // Potential Crash
+
+            // Check if still online visually, API has false negatives
+            let likely_online = check_if_still_online();
+            if likely_online {
+                return; // Confirmed still online visually, ignore API
+            }
+
             println!("Potential crash detected");
             rejoin_mesage = "[Crash recovery complete! Ready to accept commands.]";
             let is_active = check_active(&bot_config.game_name.clone());
             let exe_status = if is_active { "Running" } else { "Not found" };
-            let message = format!("Likely crash detected | {exe_status}");
+            let message =
+                format!("Likely crash detected & visual confirmation failed. EXE was {exe_status}");
             notify_admin(&message).await.ok();
         }
 
@@ -2837,6 +2845,28 @@ fn get_pixel(
     match serde_json::from_str::<bool>(&String::from_utf8_lossy(&output.stdout)) {
         Ok(return_val) => {
             println!("Pixel Response: {return_val}");
+            return_val
+        }
+        Err(e) => {
+            eprintln!("Error! {e:#?}");
+            false
+        }
+    }
+}
+
+fn check_if_still_online() -> bool {
+    println!("[check_if_crashed] STARTED");
+    let output = Command::new("cmd")
+        .args(["/C", "poetry", "run", "python", "check_if_online.py"])
+        .current_dir("../python")
+        .output()
+        .expect("[check_if_crashed] Failed to execute process");
+    println!("[check_if_crashed] EXECUTED");
+    println!("{}", String::from_utf8_lossy(&output.stdout));
+    eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+    match serde_json::from_str::<bool>(&String::from_utf8_lossy(&output.stdout)) {
+        Ok(return_val) => {
+            println!("[check_if_crashed] Is likely online: {return_val}");
             return_val
         }
         Err(e) => {
