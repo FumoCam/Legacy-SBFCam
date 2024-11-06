@@ -8,3 +8,8 @@
 resources/private
 censor/
 hud/
+
+
+# Debug files
+python/crashcheck*.jpg
+python/log_*

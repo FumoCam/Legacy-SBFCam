@@ -216,4 +216,4 @@ def check_if_still_online() -> bool:
 
 if __name__ == "__main__":
     result = check_if_still_online()
-    print(json.dumps(result)) # For rust to read console output
+    print(str(result).lower()) # For rust to read console output
