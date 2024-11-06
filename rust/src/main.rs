@@ -3238,6 +3238,14 @@ pub async fn main() {
     dotenv::from_filename("..\\.env").ok();
     let bot_config = init_config();
     let bot_state = init_state();
+
+    // if check_if_still_online() {
+    //     print!("online");
+    // } else {
+    //     print!("not online");
+    // }
+    // return;
+
     //check_active(&bot_config.game_name);
     // click_console_input();
     //run_console_command(&bot_config.game_name, "test");
