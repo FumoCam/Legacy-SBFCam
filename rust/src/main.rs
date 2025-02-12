@@ -2367,6 +2367,7 @@ fn _force_rejoin(
             instruction: Instruction::Wait { amount_ms: 7000 },
         });
     }
+    println!("[_force_rejoin] Injecting TerminateGame");
     instructions.push(InstructionPair {
         execution_order: 2,
         instruction: Instruction::TerminateGame {},
@@ -2515,6 +2516,7 @@ async fn server_check_logic(
             let mut state = bot_state.write().unwrap();
             state.is_server_hopping = true;
         }
+        println!("[server_check_logic][in_server] Injecting TerminateGame");
         instructions = vec![
             InstructionPair {
                 execution_order: 0,
@@ -2596,6 +2598,7 @@ async fn server_check_logic(
             notify_admin(&message).await.ok();
         }
 
+        println!("[server_check_logic][NOT in_server] Injecting TerminateGame");
         instructions = vec![
             InstructionPair {
                 execution_order: 0,
@@ -2645,13 +2648,25 @@ async fn server_check_loop(
     bot_config: BotConfig,
     bot_state: BotState,
 ) {
+    // let init_interval_minutes = 2;
+    // let mut init_interval =
+    //     tokio::time::interval(Duration::from_millis(init_interval_minutes * 60 * 1000));
+    // println!("[server_check_loop] Initialized, waiting for init time before looping");
+    // init_interval.tick().await; // First tick is instant
+    // init_interval.tick().await;
+
     let interval_minutes = 3;
     let mut interval = tokio::time::interval(Duration::from_millis(interval_minutes * 60 * 1000));
+    interval.tick().await; // first tick is instant
     let mut interval2 = tokio::time::interval(Duration::from_millis(1000));
+    interval2.tick().await; // first tick is instant
     loop {
+        println!("[server_check_loop] Loop start");
         // interval.tick().await;
         let get_instances_result = get_instances(bot_config.game_id).await;
+        println!("[server_check_loop] Waiting for 1000ms after getting instances");
         interval2.tick().await;
+        println!("[server_check_loop] Wait complete for 1000ms after getting instances");
         match get_instances_result {
             Ok(instance_list_option) => match instance_list_option {
                 Some(instance_list) => {
@@ -2676,7 +2691,9 @@ async fn server_check_loop(
                 eprintln!("[Roblox API check failed]");
             }
         }
+        println!("[server_check_loop] Loop end, waiting for standard interval");
         interval.tick().await;
+        println!("[server_check_loop] Loop end, waiting completed");
     }
 }
 
@@ -3282,6 +3299,7 @@ pub async fn main() {
     let hud_loop_task = hud_loop(hud_receiver);
     let hud_ws_server_task = hud_ws_server(hud_sender.clone());
 
+    terminate_running_exe("RobloxCrashHandler.exe");
     check_active(&bot_config.game_name.clone());
 
     let (_r1, _r2, _r3, _r4, _r5, _r6, _r7) = tokio::join!(
