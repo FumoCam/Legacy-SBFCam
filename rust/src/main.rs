@@ -48,6 +48,8 @@ mod scancode {
     pub const SPACE: u16 = 0x39;
     pub const SLASH: u16 = 0x35;
     pub const ENTER: u16 = 0x1C;
+    pub const RIGHT_BRACKET: u16 = 0x1B; // ']'/'}'
+    pub const BACKSPACE: u16 = 0x0E; // Scancode for Backspace key
 }
 
 fn char_to_scancode(c: char) -> u16 {
@@ -58,6 +60,7 @@ fn char_to_scancode(c: char) -> u16 {
         'd' => scancode::D,
         'o' => scancode::O,
         'i' => scancode::I,
+        ']' => scancode::RIGHT_BRACKET,
         _ => panic!("Invalid input character"),
     }
 }
@@ -265,17 +268,17 @@ fn send_user_chat(author: &str, msg: &str) {
     enigo.raw(scancode::ENTER, Click).unwrap();
 }
 
-fn open_console_chat() {
-    // Open console using chat commands
-    const DELAY: Duration = Duration::from_millis(300);
-    let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    send_system_chat(&String::from("/sbfconsole"));
-    mouse_move(&mut enigo, 0.5, 0.225);
-    thread::sleep(DELAY);
-    mouse_click(&mut enigo);
-    thread::sleep(DELAY);
-    mouse_hide(&mut enigo);
-}
+// fn open_console_chat() {
+//     // Open console using chat commands
+//     const DELAY: Duration = Duration::from_millis(300);
+//     let mut enigo = Enigo::new(&Settings::default()).unwrap();
+//     send_system_chat(&String::from("/sbfconsole"));
+//     mouse_move(&mut enigo, 0.5, 0.225);
+//     thread::sleep(DELAY);
+//     mouse_click(&mut enigo);
+//     thread::sleep(DELAY);
+//     mouse_hide(&mut enigo);
+// }
 
 fn close_console_with_enter() {
     // Close constole with enter a few times
@@ -290,6 +293,19 @@ fn close_console_with_enter() {
     thread::sleep(DELAY);
     enigo.raw(scancode::ENTER, Click).unwrap();
 }
+fn clear_console_with_backspace() {
+    // Clear console if we held ] too long
+    const DELAY: Duration = Duration::from_millis(150);
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
+    thread::sleep(DELAY);
+    enigo.raw(scancode::BACKSPACE, Click).unwrap();
+    thread::sleep(DELAY);
+    enigo.raw(scancode::BACKSPACE, Click).unwrap();
+    thread::sleep(DELAY);
+    enigo.raw(scancode::BACKSPACE, Click).unwrap();
+    thread::sleep(DELAY);
+    enigo.raw(scancode::BACKSPACE, Click).unwrap();
+}
 
 // fn toggle_console_mouse(window_title: &str) {
 //     check_active(window_title);
@@ -303,22 +319,30 @@ fn close_console_with_enter() {
 //     println!("hotfix_close_console");
 // }
 
-fn click_console_input() {
+// fn click_console_input() {
+//     const DELAY: Duration = Duration::from_millis(500);
+//     let mut enigo = Enigo::new(&Settings::default()).unwrap();
+//     mouse_move(&mut enigo, 0.5, 0.23);
+//     thread::sleep(DELAY);
+//     mouse_move(&mut enigo, 0.5, 0.23);
+//     thread::sleep(DELAY);
+//     mouse_click(&mut enigo);
+//     println!("hotfix_console_clicked");
+// }
+fn open_console_via_keybind() {
     const DELAY: Duration = Duration::from_millis(500);
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
-    mouse_move(&mut enigo, 0.5, 0.23);
     thread::sleep(DELAY);
-    mouse_move(&mut enigo, 0.5, 0.23);
+    clear_console_with_backspace();
     thread::sleep(DELAY);
-    mouse_click(&mut enigo);
-    println!("hotfix_console_clicked");
+    enigo.raw(scancode::RIGHT_BRACKET, Click).unwrap();
+    println!("hotfix_console_opened");
 }
 
 fn run_console_command(window_title: &str, command: &str) {
     check_active(window_title);
-    open_console_chat();
+    open_console_via_keybind();
     thread::sleep(Duration::from_millis(750));
-    click_console_input();
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
     thread::sleep(Duration::from_millis(750));
     enigo.text(command).unwrap();
