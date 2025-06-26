@@ -2219,7 +2219,7 @@ pub async fn anti_afk_loop(
                 InstructionPair {
                     execution_order: 2,
                     instruction: Instruction::SystemChatMessage {
-                        message: "Go to its Roblox profile and click the purple T witch icon!"
+                        message: "Go to its Roblox profile and click the purple streaming app!"
                             .to_string(),
                     },
                 },
