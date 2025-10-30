@@ -475,7 +475,7 @@ fn show_window(raw_window_hwnd_ref: *mut winapi::shared::windef::HWND__) -> bool
 fn trigger_restart() {
     println!("Restart subprocess started");
     let output = Command::new("cmd")
-        .args(["/C", "shutdown", "/f", "/r", "/t", "0"])
+        .args(["/C", "shutdown", "/f", "/s", "/t", "0"])
         .output()
         .expect("failed to execute restart");
     println!("Restart subprocess finished");
