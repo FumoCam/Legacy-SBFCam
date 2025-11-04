@@ -13,3 +13,5 @@ hud/
 # Debug files
 python/crashcheck*.jpg
 python/log_*
+target/rust-analyzer/flycheck0/stderr
+target/rust-analyzer/flycheck0/stdout
