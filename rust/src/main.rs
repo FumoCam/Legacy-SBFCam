@@ -12,7 +12,7 @@ use chrono::Timelike;
 use enigo::{
     Button, Coordinate,
     Direction::{Click, Press, Release},
-    Enigo, Keyboard, Mouse, Settings,
+    Enigo, Key, Keyboard, Mouse, Settings,
 };
 use phf::phf_set;
 use reqwest::StatusCode;
@@ -221,6 +221,23 @@ fn mouse_hide(enigo: &mut Enigo) {
     mouse_move_trigger(enigo);
 }
 
+fn type_chars(enigo: &mut Enigo, msg: &str) {
+    let type_delay = Duration::from_nanos(0);
+    for ch in msg.chars() {
+        let result = match ch {
+            '\n' | '\r' => enigo.key(Key::Return, enigo::Direction::Click),
+            '\t' => enigo.key(Key::Tab, enigo::Direction::Click),
+            ' ' => enigo.key(Key::Space, enigo::Direction::Click),
+            ch => enigo.key(Key::Unicode(ch), enigo::Direction::Click),
+        };
+
+        if result.is_err() {
+            enigo.text(&ch.to_string()).unwrap();
+        }
+        thread::sleep(type_delay);
+    }
+}
+
 fn send_system_chat(msg: &str) {
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
     let suffixed_msg = format!("{msg} "); // Space suffix, to avoid cutoff
@@ -231,10 +248,10 @@ fn send_system_chat(msg: &str) {
     thread::sleep(type_delay);
     if msg.starts_with('/') {
         // Chat command
-        enigo.text(msg.as_ref()).unwrap();
+        type_chars(&mut enigo, msg);
     } else {
         // Standard message
-        enigo.text(suffixed_msg.as_ref()).unwrap();
+        type_chars(&mut enigo, suffixed_msg.as_ref());
     }
     thread::sleep(send_delay);
     enigo.raw(scancode::ENTER, Click).unwrap();
@@ -263,7 +280,9 @@ fn send_user_chat(author: &str, msg: &str) {
     // Message
     enigo.raw(scancode::SLASH, Click).unwrap();
     thread::sleep(type_delay);
-    enigo.text(&total_msg).unwrap();
+    // enigo.text(&total_msg).unwrap();
+    let truncated: String = total_msg.chars().take(198).collect();
+    type_chars(&mut enigo, &truncated);
     thread::sleep(send_delay);
     enigo.raw(scancode::ENTER, Click).unwrap();
 }
