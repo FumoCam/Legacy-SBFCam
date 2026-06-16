@@ -222,7 +222,7 @@ fn mouse_hide(enigo: &mut Enigo) {
 }
 
 fn type_chars(enigo: &mut Enigo, msg: &str) {
-    let type_delay = Duration::from_nanos(0);
+    let type_delay = Duration::from_millis(250);
     for ch in msg.chars() {
         let result = match ch {
             '\n' | '\r' => enigo.key(Key::Return, enigo::Direction::Click),
