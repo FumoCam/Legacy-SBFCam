@@ -216,13 +216,16 @@ fn mouse_click(enigo: &mut Enigo) {
     enigo.button(Button::Left, Press).unwrap();
     enigo.button(Button::Left, Release).unwrap();
 }
+fn mouse_scroll(enigo: &mut Enigo) {
+    enigo.scroll(10, enigo::Axis::Vertical).unwrap();
+}
 fn mouse_hide(enigo: &mut Enigo) {
     mouse_move(enigo, 1.0, 1.0);
     mouse_move_trigger(enigo);
 }
 
 fn type_chars(enigo: &mut Enigo, msg: &str) {
-    let type_delay = Duration::from_millis(250);
+    let type_delay = Duration::from_millis(10);
     for ch in msg.chars() {
         let result = match ch {
             '\n' | '\r' => enigo.key(Key::Return, enigo::Direction::Click),
@@ -236,6 +239,22 @@ fn type_chars(enigo: &mut Enigo, msg: &str) {
         }
         thread::sleep(type_delay);
     }
+}
+
+fn scroll_down_chat(enigo: &mut Enigo) {
+    let delay = Duration::from_millis(400);
+    thread::sleep(delay);
+    mouse_move(enigo, 0.1, 0.225);
+    thread::sleep(delay);
+    mouse_scroll(enigo);
+    thread::sleep(delay);
+    mouse_hide(enigo);
+}
+
+fn scroll_down_chat_action() {
+    // For independant use
+    let mut enigo = Enigo::new(&Settings::default()).unwrap();
+    scroll_down_chat(&mut enigo);
 }
 
 fn send_system_chat(msg: &str) {
@@ -255,6 +274,8 @@ fn send_system_chat(msg: &str) {
     }
     thread::sleep(send_delay);
     enigo.raw(scancode::ENTER, Click).unwrap();
+    thread::sleep(send_delay);
+    scroll_down_chat(&mut enigo);
 }
 
 fn send_user_chat(author: &str, msg: &str) {
@@ -285,6 +306,8 @@ fn send_user_chat(author: &str, msg: &str) {
     type_chars(&mut enigo, &truncated);
     thread::sleep(send_delay);
     enigo.raw(scancode::ENTER, Click).unwrap();
+    thread::sleep(send_delay);
+    scroll_down_chat(&mut enigo);
 }
 
 // fn open_console_chat() {
@@ -543,6 +566,7 @@ pub enum Instruction {
     },
     Restart {},
     Sit {},
+    ScrollDownChat {},
     SystemChatMessage {
         message: String,
     },
@@ -707,6 +731,13 @@ pub async fn queue_processor(
                         instruction_history.push(history_entry);
                     }
                     navbar_sit();
+                }
+                Instruction::ScrollDownChat {} => {
+                    print!("scrolldownchat");
+                    if client_origin {
+                        instruction_history.push(history_entry);
+                    }
+                    scroll_down_chat_action();
                 }
                 Instruction::SystemChatMessage { message } => {
                     println!("system_chat_message");
@@ -2212,6 +2243,10 @@ pub async fn anti_afk_loop(
                     InstructionPair {
                         execution_order: 5,
                         instruction: Instruction::MoveCameraX { x_ratio: 45.0 },
+                    },
+                    InstructionPair {
+                        execution_order: 6,
+                        instruction: Instruction::ScrollDownChat {},
                     },
                 ],
             };
