@@ -2770,8 +2770,9 @@ fn join_game_selenium(game_id: i64, instance_id: &str) {
 
 #[must_use]
 pub fn restart_warn(restart_warn_ticker: i32) -> i32 {
-    let now = chrono::offset::Local::now();
-    if now.hour() != 3 {
+    // 9am EST/10am EDT
+    let now = chrono::offset::Utc::now();
+    if now.hour() != 13 {
         return -1;
     }
     const FIVE_MINUTE_WARNING: i32 = 55;
