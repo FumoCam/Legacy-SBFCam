@@ -242,7 +242,7 @@ fn type_chars(enigo: &mut Enigo, msg: &str) {
 }
 
 fn scroll_down_chat(enigo: &mut Enigo) {
-    let delay = Duration::from_millis(400);
+    let delay = Duration::from_millis(800);
     thread::sleep(delay);
     mouse_move(enigo, 0.1, 0.225);
     thread::sleep(delay);
@@ -2274,7 +2274,8 @@ pub async fn anti_afk_loop(
                 InstructionPair {
                     execution_order: 2,
                     instruction: Instruction::SystemChatMessage {
-                        message: "Click the purple icon in this bot's profile!".to_string(),
+                        message: "Ask around where you can find it! (Abiding by Roblox TOS)"
+                            .to_string(),
                     },
                 },
             ],
