@@ -225,7 +225,7 @@ fn mouse_hide(enigo: &mut Enigo) {
 }
 
 fn type_chars(enigo: &mut Enigo, msg: &str) {
-    let type_delay = Duration::from_millis(10);
+    let type_delay = Duration::from_millis(15);
     for ch in msg.chars() {
         let result = match ch {
             '\n' | '\r' => enigo.key(Key::Return, enigo::Direction::Click),
@@ -275,7 +275,6 @@ fn send_system_chat(msg: &str) {
     thread::sleep(send_delay);
     enigo.raw(scancode::ENTER, Click).unwrap();
     thread::sleep(send_delay);
-    scroll_down_chat(&mut enigo);
 }
 
 fn send_user_chat(author: &str, msg: &str) {
@@ -307,7 +306,6 @@ fn send_user_chat(author: &str, msg: &str) {
     thread::sleep(send_delay);
     enigo.raw(scancode::ENTER, Click).unwrap();
     thread::sleep(send_delay);
-    scroll_down_chat(&mut enigo);
 }
 
 // fn open_console_chat() {
@@ -387,7 +385,7 @@ fn run_console_command(window_title: &str, command: &str) {
     thread::sleep(Duration::from_millis(750));
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
     thread::sleep(Duration::from_millis(750));
-    enigo.text(command).unwrap();
+    type_chars(&mut enigo, &command);
     thread::sleep(Duration::from_millis(750));
     enigo.raw(scancode::ENTER, Click).unwrap();
     thread::sleep(Duration::from_millis(750));
@@ -2121,6 +2119,26 @@ pub async fn twitch_loop(
                         //     .say_in_reply_to(&msg, message.to_string())
                         //     .await
                         //     .unwrap();
+                    }
+                    "scroll" => {
+                        client
+                            .say_in_reply_to(
+                                &msg,
+                                String::from("[Attempting to scroll chat to bottom]"),
+                            )
+                            .await
+                            .unwrap();
+                        let scroll_instructions = SystemInstruction {
+                            client: Some(client.clone()),
+                            chat_message: Some(msg.clone()),
+                            instructions: vec![InstructionPair {
+                                execution_order: 0,
+                                instruction: Instruction::ScrollDownChat {},
+                            }],
+                        };
+                        if let Err(_e) = queue_sender.send(scroll_instructions) {
+                            eprintln!("Jump Channel Error");
+                        }
                     }
                     _ => {
                         client
