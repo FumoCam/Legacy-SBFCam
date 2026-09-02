@@ -844,6 +844,7 @@ pub fn get_warp_locations() -> (HashMap<String, String>, String) {
             ("shrine", "Moriya Shrine"),
             ("somewhere", "somewhere"),
             ("minceraft", "minceraft"),
+            ("arcade", "Arcade"),
         ]
         .map(|(a, b)| (String::from(a), String::from(b))),
     );
