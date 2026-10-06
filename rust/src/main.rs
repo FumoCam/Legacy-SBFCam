@@ -390,6 +390,11 @@ fn run_console_command(window_title: &str, command: &str) {
     enigo.raw(scancode::ENTER, Click).unwrap();
     thread::sleep(Duration::from_millis(750));
     close_console_with_enter();
+    // TODO: OpenCV if console is opened or close bc this is getting ridiculous
+    thread::sleep(Duration::from_millis(750));
+    mouse_move(&mut enigo, 0.01, 0.99);
+    thread::sleep(Duration::from_millis(500));
+    mouse_click(&mut enigo);
 }
 
 async fn discord_log(
